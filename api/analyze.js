@@ -80,7 +80,7 @@ const schema = obj({
     },
     learningResources: {
         type: 'ARRAY',
-        items: obj({ skill: str, resource: str, type: str, timeToComplete: str })
+        items: obj({ skill: str, resource: str, provider: str, url: str, type: str, timeToComplete: str })
     },
     resumeImprovements: {
         type: 'ARRAY',
@@ -101,7 +101,7 @@ INSTRUCTIONS:
 - Make missingSkills prioritized and concrete. Include a four-week roadmap.
 - Generate a professional, personalized 3-paragraph cover letter draft addressing the specific opportunity.
 - Provide 5 likely interview questions with reasoning and suggested answers based on the candidate profile.
-- For learningResources, suggest specific free platforms (Coursera, freeCodeCamp, Khan Academy, MDN, YouTube) with realistic time estimates.
+- For learningResources, suggest 3-5 specific free resources for the top skill gaps. Each item MUST include: skill (the gap being addressed), resource (descriptive title of the course/page), provider (platform name e.g. "freeCodeCamp", "MDN Web Docs", "Coursera"), url (the real, permanent homepage or course-index URL for that platform/resource — use only verified base URLs: https://www.freecodecamp.org, https://developer.mozilla.org, https://www.coursera.org, https://www.edx.org, https://www.kaggle.com/learn, https://www.youtube.com, https://ocw.mit.edu, https://developers.google.com, https://learn.microsoft.com, https://docs.aws.amazon.com, https://cloud.google.com/learn, https://www.khanacademy.org — do NOT invent course-specific paths), type (e.g. "Free course", "Documentation", "Tutorial"), timeToComplete (realistic estimate).
 - For resumeImprovements, show the current weak phrasing vs improved phrasing with impact level (High/Medium/Low).
 - hiddenRequirements are unstated qualifications implicitly expected (e.g., cultural fit, soft skills, unwritten prerequisites).
 - atsReadiness evaluates keyword optimization, formatting clarity, and machine parsability of the resume. Score 0-100.

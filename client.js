@@ -1,5 +1,5 @@
 /*
- * Nova AI â€” decision-first frontend
+ * Nova AI — decision-first frontend
  * Preserves the existing API contract and report schema while changing only
  * the presentation and navigation model.
  */
@@ -27,10 +27,10 @@ const storage = {
 
 const samples = {
   profile: `Priya Sharma is a 20-year-old third-year B.Tech Computer Science student at Delhi Technological University, graduating May 2027. CGPA: 8.6/10. Indian citizen. Skills: JavaScript, TypeScript, React, Python, SQL, Git, Figma. Completed a 3-month frontend engineering internship at a fintech startup and shipped React components used by 10,000+ users. Led a team of four at a university hackathon; placed second. Volunteers teaching digital literacy. Available 15 hours per week.`,
-  resume: `PRIYA SHARMA | Delhi, India | priya@example.com | github.com/priyasharma\n\nEDUCATION\nB.Tech, Computer Science, Delhi Technological University | 2023â€“2027 | CGPA 8.6/10\n\nSKILLS\nPython, JavaScript, TypeScript, React, SQL, Git, Figma; English and Hindi\n\nEXPERIENCE\nFrontend Engineering Intern, Fintech Startup | Mayâ€“Jul 2025\nBuilt reusable React components for a payments dashboard used by 10,000+ users.\n\nPROJECTS\nAccessLearn: React learning tool with accessible UI, 300 student users.\n\nACHIEVEMENTS\n2nd place, DTU Hackathon 2025. Google UX Design Certificate.`,
-  internship: `Product Engineering Intern â€” Atlas Labs\nLocation: Bengaluru or remote, India | Deadline: 30 September 2026\nAtlas Labs is seeking undergraduate CS students for a 12-week paid internship. Applicants need strong JavaScript or Python, SQL fundamentals, experience shipping a web product, and 15 hours/week availability. Preferred: React, GitHub portfolio, cloud deployment, and collaborative communication. Submit a resume, transcript, portfolio/GitHub and short cover letter. Benefits include mentorship, stipend and conversion consideration.`,
-  scholarship: `Global Digital Futures Fellowship 2026\nA fully funded, six-month remote fellowship for undergraduate students designing technology for social impact. Fellows receive mentorship, a $2,000 project grant, and an invitation to a final summit in Singapore.\nEligibility: enrolled undergraduate students aged 18â€“25 from South or Southeast Asia, Africa, or Latin America; one year of programming or digital product-building experience; written English; 12 hours weekly Janâ€“Jun 2026. Preferred: community impact, leadership, accessibility, education, climate or financial inclusion projects. Apply with CV, statement of purpose, portfolio/GitHub, transcript, academic reference, 90-second video and passport.`,
-  competition: `AI for Good Student Challenge 2026\nRemote global competition for university students. Form a team of 2â€“5 and build an AI solution addressing climate resilience. Required: Python, machine learning fundamentals, a public GitHub repository and student enrollment. Preferred: deployed demo, data visualization and presentation experience. Deadline: 15 October 2026. Prizes include cloud credits, mentorship and $5,000.`
+  resume: `PRIYA SHARMA | Delhi, India | priya@example.com | github.com/priyasharma\n\nEDUCATION\nB.Tech, Computer Science, Delhi Technological University | 2023–2027 | CGPA 8.6/10\n\nSKILLS\nPython, JavaScript, TypeScript, React, SQL, Git, Figma; English and Hindi\n\nEXPERIENCE\nFrontend Engineering Intern, Fintech Startup | May–Jul 2025\nBuilt reusable React components for a payments dashboard used by 10,000+ users.\n\nPROJECTS\nAccessLearn: React learning tool with accessible UI, 300 student users.\n\nACHIEVEMENTS\n2nd place, DTU Hackathon 2025. Google UX Design Certificate.`,
+  internship: `Product Engineering Intern — Atlas Labs\nLocation: Bengaluru or remote, India | Deadline: 30 September 2026\nAtlas Labs is seeking undergraduate CS students for a 12-week paid internship. Applicants need strong JavaScript or Python, SQL fundamentals, experience shipping a web product, and 15 hours/week availability. Preferred: React, GitHub portfolio, cloud deployment, and collaborative communication. Submit a resume, transcript, portfolio/GitHub and short cover letter. Benefits include mentorship, stipend and conversion consideration.`,
+  scholarship: `Global Digital Futures Fellowship 2026\nA fully funded, six-month remote fellowship for undergraduate students designing technology for social impact. Fellows receive mentorship, a $2,000 project grant, and an invitation to a final summit in Singapore.\nEligibility: enrolled undergraduate students aged 18–25 from South or Southeast Asia, Africa, or Latin America; one year of programming or digital product-building experience; written English; 12 hours weekly Jan–Jun 2026. Preferred: community impact, leadership, accessibility, education, climate or financial inclusion projects. Apply with CV, statement of purpose, portfolio/GitHub, transcript, academic reference, 90-second video and passport.`,
+  competition: `AI for Good Student Challenge 2026\nRemote global competition for university students. Form a team of 2–5 and build an AI solution addressing climate resilience. Required: Python, machine learning fundamentals, a public GitHub repository and student enrollment. Preferred: deployed demo, data visualization and presentation experience. Deadline: 15 October 2026. Prizes include cloud credits, mentorship and $5,000.`
 };
 
 const profileInput = $('#profileInput');
@@ -56,7 +56,7 @@ function toast(message) {
 function countTo(element, target, suffix = '', duration = 650) {
   if (!element) return;
   if (target === null || target === undefined) {
-    element.textContent = 'â€”';
+    element.textContent = '—';
     element.setAttribute('aria-label', 'Fit score not available');
     return;
   }
@@ -322,7 +322,7 @@ async function addResumeFile(file) {
     return;
   }
   if (isPdf) {
-    toast('Reading PDFâ€¦');
+    toast('Reading PDF…');
     const text = await extractTextFromPDF(file);
     if (text && text.length > 10) {
       profileInput.value = text.slice(0, 8000);
@@ -453,10 +453,10 @@ function stopLoading() {
 }
 function friendlyError(message) {
   const raw = String(message || '');
-  if (/Groq|GROQ_API_KEY|server is not configured|not configured for AI analysis|STAGE|provider|invalid analysis/i.test(raw)) return 'Analysis is unavailable in this preview right now. Your inputs are still hereâ€”please try again later.';
-  if (/timed out/i.test(raw)) return 'The analysis took too long to finish. Your inputs are still hereâ€”please try again.';
+  if (/Groq|GROQ_API_KEY|server is not configured|not configured for AI analysis|STAGE|provider|invalid analysis/i.test(raw)) return 'Analysis is unavailable in this preview right now. Your inputs are still here—please try again later.';
+  if (/timed out/i.test(raw)) return 'The analysis took too long to finish. Your inputs are still here—please try again.';
   if (/too many/i.test(raw)) return raw;
-  return raw || 'Something went wrong. Your inputs are still hereâ€”please try again.';
+  return raw || 'Something went wrong. Your inputs are still here—please try again.';
 }
 
 async function runAnalysis() {
@@ -574,11 +574,11 @@ function firstText(values, fallback) {
 }
 function biggestConcern(report) {
   const gap = arr(report?.missingSkills)[0];
-  if (gap?.skill) return `${gap.skill}${gap.whyItMatters ? ` â€” ${gap.whyItMatters}` : ''}`;
+  if (gap?.skill) return `${gap.skill}${gap.whyItMatters ? ` — ${gap.whyItMatters}` : ''}`;
   const unknownRequirement = requirementItems(report).find((item) => normalizeStatus(item.status).key === 'unknown');
-  if (unknownRequirement?.requirement) return `${unknownRequirement.requirement}${unknownRequirement.evidence ? ` â€” ${unknownRequirement.evidence}` : ''}`;
+  if (unknownRequirement?.requirement) return `${unknownRequirement.requirement}${unknownRequirement.evidence ? ` — ${unknownRequirement.evidence}` : ''}`;
   const risk = arr(report?.riskAnalysis)[0];
-  if (risk?.risk) return `${risk.risk}${risk.mitigation ? ` â€” ${risk.mitigation}` : ''}`;
+  if (risk?.risk) return `${risk.risk}${risk.mitigation ? ` — ${risk.mitigation}` : ''}`;
   return firstText(report?.weaknesses, notAvailable());
 }
 function nextBestAction(report) {
@@ -588,7 +588,7 @@ function nextBestAction(report) {
 }
 function contextCandidate(report) {
   const profile = report?.profileSummary || {};
-  return { name: profile.name || 'Candidate profile', meta: [profile.degree, profile.university].filter(Boolean).join(' Â· ') || notAvailable() };
+  return { name: profile.name || 'Candidate profile', meta: [profile.degree, profile.university].filter(Boolean).join(' · ') || notAvailable() };
 }
 function statusClass(status) { return normalizeStatus(status).key; }
 function detailRequirement(x) {
@@ -600,11 +600,91 @@ function detailRequirement(x) {
   const mandatory = x.mandatory === true ? '<span class="detail-required">Required</span>' : '';
   return `<details class="detail-item"><summary class="detail-item-header"><strong>${requirementText || 'Requirement'}</strong><span class="detail-status-group">${mandatory}<span class="status-${status.key}">${safe(status.label)}</span></span></summary><p><b>Evidence:</b> ${evidence}</p><p><b>Reasoning:</b> ${reasoning}</p><small><b>Confidence:</b> ${confidence}</small></details>`;
 }
-function resourceMarkup(resource) {
-  const value = String(resource?.resource || '');
-  const url = value.match(/https?:\/\/[^\s)]+/i)?.[0];
-  return `<article class="detail-item"><div class="detail-item-header"><strong>${safe(resource?.skill || 'Recommended resource')}</strong><span class="status-unknown">${safe(resource?.timeToComplete || resource?.type || 'Resource')}</span></div><p>${safe(value)}</p>${url ? `<a class="detail-link" href="${safe(url)}" target="_blank" rel="noopener noreferrer">Open resource <i data-lucide="arrow-up-right"></i></a>` : ''}</article>`;
+// Trusted platform base hostnames — LLM-provided URLs are only used if their hostname matches.
+const TRUSTED_RESOURCE_ORIGINS = new Set([
+  'freecodecamp.org', 'developer.mozilla.org', 'coursera.org', 'edx.org',
+  'kaggle.com', 'youtube.com', 'youtu.be', 'ocw.mit.edu', 'developers.google.com',
+  'learn.microsoft.com', 'docs.aws.amazon.com', 'cloud.google.com', 'khanacademy.org',
+  'docs.python.org', 'docs.docker.com', 'git-scm.com', 'reactjs.org', 'react.dev',
+  'typescriptlang.org', 'nodejs.org', 'flask.palletsprojects.com', 'fastapi.tiangolo.com',
+  'postgresql.org', 'sqlite.org', 'redis.io', 'aws.amazon.com', 'azure.microsoft.com',
+  'cloud.google.com', 'figma.com', 'linkedin.com', 'github.com'
+]);
+
+// Provider name -> guaranteed-safe homepage/learn-index URL.
+const PROVIDER_FALLBACK_URLS = {
+  'freecodecamp': 'https://www.freecodecamp.org',
+  'mdn web docs': 'https://developer.mozilla.org',
+  'mdn': 'https://developer.mozilla.org',
+  'mozilla': 'https://developer.mozilla.org',
+  'coursera': 'https://www.coursera.org',
+  'edx': 'https://www.edx.org',
+  'kaggle': 'https://www.kaggle.com/learn',
+  'youtube': 'https://www.youtube.com',
+  'mit opencourseware': 'https://ocw.mit.edu',
+  'mit': 'https://ocw.mit.edu',
+  'google developers': 'https://developers.google.com',
+  'google': 'https://developers.google.com/learn',
+  'microsoft learn': 'https://learn.microsoft.com',
+  'microsoft': 'https://learn.microsoft.com',
+  'aws': 'https://docs.aws.amazon.com',
+  'amazon web services': 'https://docs.aws.amazon.com',
+  'google cloud': 'https://cloud.google.com/learn',
+  'khan academy': 'https://www.khanacademy.org',
+  'khanacademy': 'https://www.khanacademy.org',
+  'typescript': 'https://www.typescriptlang.org/docs/',
+  'react': 'https://react.dev',
+  'node.js': 'https://nodejs.org/en/learn',
+  'nodejs': 'https://nodejs.org/en/learn',
+  'python': 'https://docs.python.org/3/tutorial/',
+  'docker': 'https://docs.docker.com',
+  'git': 'https://git-scm.com/doc',
+  'github': 'https://docs.github.com',
+  'postgresql': 'https://www.postgresql.org/docs/',
+  'redis': 'https://redis.io/docs/',
+  'flask': 'https://flask.palletsprojects.com',
+  'fastapi': 'https://fastapi.tiangolo.com',
+  'figma': 'https://www.figma.com/resources/learn-design/'
+};
+
+function safeResourceUrl(url, provider) {
+  if (url && typeof url === 'string' && url.startsWith('http')) {
+    try {
+      const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+      // Exact match or subdomain of trusted origin (e.g. docs.github.com -> github.com)
+      if (TRUSTED_RESOURCE_ORIGINS.has(hostname)) return url;
+      for (const trusted of TRUSTED_RESOURCE_ORIGINS) {
+        if (hostname.endsWith('.' + trusted) || hostname === trusted) return url;
+      }
+    } catch { /* invalid URL — fall through */ }
+  }
+  if (provider && typeof provider === 'string') {
+    const key = provider.toLowerCase().trim();
+    if (PROVIDER_FALLBACK_URLS[key]) return PROVIDER_FALLBACK_URLS[key];
+    for (const [k, v] of Object.entries(PROVIDER_FALLBACK_URLS)) {
+      if (key.includes(k) || k.includes(key.split(' ')[0])) return v;
+    }
+  }
+  return null;
 }
+
+function resourceMarkup(resource) {
+  if (!resource || typeof resource !== 'object') return '';
+  const skill = String(resource.skill || 'Learning resource');
+  const title = String(resource.resource || resource.skill || 'Resource');
+  const provider = String(resource.provider || '');
+  const type = String(resource.type || '');
+  const duration = String(resource.timeToComplete || '');
+  const resolvedUrl = safeResourceUrl(resource.url, provider || resource.resource);
+  const badge = type ? `<span class="status-unknown resource-type-badge">${safe(type)}</span>` : '';
+  const durationEl = duration ? `<span class="resource-duration">${safe(duration)}</span>` : '';
+  const providerEl = provider ? `<div class="resource-provider">${safe(provider)}</div>` : '';
+  const linkEl = resolvedUrl
+    ? `<a class="resource-open-link" href="${safe(resolvedUrl)}" target="_blank" rel="noopener noreferrer">Open resource <i data-lucide="arrow-up-right"></i></a>`
+    : `<span class="resource-no-link">No direct link</span>`;
+  return `<article class="resource-card" tabindex="0"><div class="resource-card-top">${badge}${durationEl}</div><div class="resource-card-skill">${safe(skill)}</div><strong class="resource-card-title">${safe(title)}</strong>${providerEl}<div class="resource-card-footer">${linkEl}</div></article>`;
+}
+
 function strategyMarkup(report) {
   const requirements = statusCounts(report);
   const documents = arr(report?.requiredDocuments);
@@ -619,7 +699,10 @@ function strategyMarkup(report) {
   const coverText = String(report?.coverLetter || '');
   const coverHtml = coverText ? coverText.split(/\n+/).filter(Boolean).map((para) => `<p>${safe(para)}</p>`).join('') : '<span class="empty">No cover letter was generated.</span>';
   const resources = arr(report?.learningResources);
-  return `<div class="strategy-grid"><div class="detail-summary">${requirements.total ? `${requirements.met} of ${requirements.total} mapped requirements are currently matched. Use the actions below to decide how to spend your effort.` : 'Use the evidence and gaps below to decide how to spend your effort.'}</div>${actions.map(([label, value]) => `<article class="strategy-card"><span>${safe(label)}</span><p>${safe(value)}</p></article>`).join('')}<article class="detail-item"><div class="detail-item-header"><strong>Generated cover letter</strong><button class="secondary-button" id="coverLetterCopy" type="button">Copy</button></div><div class="cover-letter-content">${coverHtml}</div></article><article class="detail-item"><div class="detail-item-header"><strong>Learning resources</strong><span class="status-unknown">${resources.length} available</span></div><div class="detail-list">${resources.length ? resources.map(resourceMarkup).join('') : '<span class="empty">No learning resources were generated.</span>'}</div></article></div>`;
+  const resourcesHtml = resources.length
+    ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>`
+    : '<span class="empty">No learning resources were generated.</span>';
+  return `<div class="strategy-grid"><div class="detail-summary">${requirements.total ? `${requirements.met} of ${requirements.total} mapped requirements are currently matched. Use the actions below to decide how to spend your effort.` : 'Use the evidence and gaps below to decide how to spend your effort.'}</div>${actions.map(([label, value]) => `<article class="strategy-card"><span>${safe(label)}</span><p>${safe(value)}</p></article>`).join('')}<article class="detail-item"><div class="detail-item-header"><strong>Generated cover letter</strong><button class="secondary-button" id="coverLetterCopy" type="button">Copy</button></div><div class="cover-letter-content">${coverHtml}</div></article><article class="detail-item"><div class="detail-item-header"><strong>Learning resources</strong><span class="status-unknown">${resources.length} available</span></div>${resourcesHtml}</article></div>`;
 }
 function moduleContent(module, report) {
   const counts = statusCounts(report);
@@ -629,11 +712,11 @@ function moduleContent(module, report) {
   if (module === 'strengths') {
     const strengths = arr(report?.strengths);
     const weaknesses = arr(report?.weaknesses);
-    return { title: 'Strengths & weaknesses', subtitle: `${strengths.length} strengths Â· ${weaknesses.length} weaknesses`, html: `<div class="detail-summary">These are the strongest signals and limitations Nova found. Use strengths as evidence and weaknesses as edit targets.</div><div class="detail-list"><span class="detail-label">STRENGTHS</span>${strengths.length ? strengths.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-met">Strong evidence</span></div><p>Supporting evidence is present in the supplied profile.</p></article>`).join('') : '<span class="empty">No strengths were returned by Nova.</span>'}<span class="detail-label">WEAKNESSES</span>${weaknesses.length ? weaknesses.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-partial">Needs attention</span></div><p>This limitation was returned by Nova from the supplied evidence.</p></article>`).join('') : '<span class="empty">No weaknesses were returned by Nova.</span>'}</div>` };
+    return { title: 'Strengths & weaknesses', subtitle: `${strengths.length} strengths · ${weaknesses.length} weaknesses`, html: `<div class="detail-summary">These are the strongest signals and limitations Nova found. Use strengths as evidence and weaknesses as edit targets.</div><div class="detail-list"><span class="detail-label">STRENGTHS</span>${strengths.length ? strengths.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-met">Strong evidence</span></div><p>Supporting evidence is present in the supplied profile.</p></article>`).join('') : '<span class="empty">No strengths were returned by Nova.</span>'}<span class="detail-label">WEAKNESSES</span>${weaknesses.length ? weaknesses.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-partial">Needs attention</span></div><p>This limitation was returned by Nova from the supplied evidence.</p></article>`).join('') : '<span class="empty">No weaknesses were returned by Nova.</span>'}</div>` };
   }
   if (module === 'gaps') {
     const gaps = arr(report?.missingSkills);
-    return { title: 'Gaps', subtitle: `${gaps.length} important gaps`, html: `<div class="detail-summary">Start with the highest-impact gap. A missing signal is not a rejection; it is a decision about what to strengthen first.</div><div class="detail-list">${gaps.length ? gaps.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.skill || 'Missing skill')}</strong><span class="status-${String(item.priority || 'medium').toLowerCase() === 'high' ? 'missing' : 'partial'}">${safe(item.priority || 'Priority')}</span></div><p><b>Why it matters:</b> ${safe(item.whyItMatters || 'This skill appears relevant to the opportunity.')}</p><small><b>Learning time:</b> ${safe(item.learningTime || 'Not specified')} Â· <b>Difficulty:</b> ${safe(item.difficulty || 'Not specified')}</small></article>`).join('') : '<span class="empty">No high-priority gaps were identified.</span>'}</div>` };
+    return { title: 'Gaps', subtitle: `${gaps.length} important gaps`, html: `<div class="detail-summary">Start with the highest-impact gap. A missing signal is not a rejection; it is a decision about what to strengthen first.</div><div class="detail-list">${gaps.length ? gaps.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.skill || 'Missing skill')}</strong><span class="status-${String(item.priority || 'medium').toLowerCase() === 'high' ? 'missing' : 'partial'}">${safe(item.priority || 'Priority')}</span></div><p><b>Why it matters:</b> ${safe(item.whyItMatters || 'This skill appears relevant to the opportunity.')}</p><small><b>Learning time:</b> ${safe(item.learningTime || 'Not specified')} · <b>Difficulty:</b> ${safe(item.difficulty || 'Not specified')}</small></article>`).join('') : '<span class="empty">No high-priority gaps were identified.</span>'}</div>` };
   }
   if (module === 'documents') {
     const documents = arr(report?.requiredDocuments);
@@ -648,7 +731,7 @@ function moduleContent(module, report) {
   }
   if (module === 'resources') {
     const resources = arr(report?.learningResources);
-    return { title: 'Learning resources', subtitle: `${resources.length} recommendation${resources.length === 1 ? '' : 's'}`, html: `<div class="detail-list">${resources.length ? resources.map(resourceMarkup).join('') : '<span class="empty">No resources were generated.</span>'}</div>` };
+    return { title: 'Learning resources', subtitle: `${resources.length} recommendation${resources.length === 1 ? '' : 's'}`, html: `<div class="detail-summary">Click a card to open the resource in a new tab. Resources are matched to the skill gaps in your profile.</div>${resources.length ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>` : '<span class="empty">No resources were generated.</span>'}` };
   }
   return { title: 'Evidence', subtitle: 'Focused details from your fit brief', html: '<span class="empty">No details are available for this module.</span>' };
 }
@@ -687,7 +770,7 @@ function renderHistory() {
   const element = $('#historyList');
   if (!element) return;
   const entries = historyEntries();
-  element.innerHTML = entries.length ? entries.map((entry) => `<button data-history="${safe(entry.id)}" aria-label="Restore analysis: ${safe(entry.title)}, score ${safe(entry.score ?? 'Not available')}"><strong>${safe(entry.title)}</strong><span>${safe(entry.score == null ? 'Not available' : `${entry.score}/100`)} Â· ${safe(humanizeVerdict(entry.verdict || 'Analysis'))} Â· ${safe(entry.timestamp || 'Saved')}</span></button>`).join('') : '<span class="empty">Your past analyses appear here.</span>';
+  element.innerHTML = entries.length ? entries.map((entry) => `<button data-history="${safe(entry.id)}" aria-label="Restore analysis: ${safe(entry.title)}, score ${safe(entry.score ?? 'Not available')}"><strong>${safe(entry.title)}</strong><span>${safe(entry.score == null ? 'Not available' : `${entry.score}/100`)} · ${safe(humanizeVerdict(entry.verdict || 'Analysis'))} · ${safe(entry.timestamp || 'Saved')}</span></button>`).join('') : '<span class="empty">Your past analyses appear here.</span>';
   $$('[data-history]').forEach((button) => button.addEventListener('click', () => {
     const entry = historyEntries().find((item) => String(item.id) === String(button.dataset.history));
     if (entry?.report) renderReport(entry.report, { save: false });
@@ -724,7 +807,7 @@ function renderReport(report, { save = false } = {}) {
   const documents = arr(latestReport.requiredDocuments);
 
   setText('#reportTitle', role);
-  setText('#reportSubtitle', `${organization} Â· evidence-based candidate analysis`);
+  setText('#reportSubtitle', `${organization} · evidence-based candidate analysis`);
   setText('#execVerdict', verdict);
   setText('#execRecommendation', latestReport.executiveRecommendation || latestReport.verdictReason || latestReport.finalVerdict || 'Your decision-ready overview will appear here.');
   countTo($('#execScore'), fit);
@@ -734,31 +817,31 @@ function renderReport(report, { save = false } = {}) {
   setText('#biggestConcern', biggestConcern(latestReport));
   setText('#nextBestAction', nextBestAction(latestReport));
   setText('#contextOpportunity', role);
-  setText('#contextOpportunityMeta', [organization, latestReport.opportunitySummary?.deadline].filter(Boolean).join(' Â· ') || 'Opportunity brief analyzed');
+  setText('#contextOpportunityMeta', [organization, latestReport.opportunitySummary?.deadline].filter(Boolean).join(' · ') || 'Opportunity brief analyzed');
   setText('#contextCandidate', candidate.name);
   setText('#contextCandidateMeta', candidate.meta);
   setText('#contextReadiness', latestReport.readinessCategory ? presentationText(latestReport.readinessCategory) : (readiness === null ? notAvailable() : `${readiness}% ready`));
-  setText('#moduleRequirementsMeta', countsData.total ? `${countsData.met} / ${countsData.total} matched Â· View evidence` : 'No requirements mapped');
+  setText('#moduleRequirementsMeta', countsData.total ? `${countsData.met} / ${countsData.total} matched · View evidence` : 'No requirements mapped');
   const weaknessCount = arr(latestReport.weaknesses).length;
-  setText('#moduleStrengthsMeta', `${strengths.length} strength${strengths.length === 1 ? '' : 's'} Â· ${weaknessCount} weakness${weaknessCount === 1 ? '' : 'es'} Â· View evidence`);
-  setText('#moduleGapsMeta', `${gaps.length} important gap${gaps.length === 1 ? '' : 's'} Â· View analysis`);
-  setText('#moduleDocumentsMeta', `${documents.length} required Â· View checklist`);
-  setText('#moduleRisksMeta', `${risks.length} identified Â· View risks`);
+  setText('#moduleStrengthsMeta', `${strengths.length} strength${strengths.length === 1 ? '' : 's'} · ${weaknessCount} weakness${weaknessCount === 1 ? '' : 'es'} · View evidence`);
+  setText('#moduleGapsMeta', `${gaps.length} important gap${gaps.length === 1 ? '' : 's'} · View analysis`);
+  setText('#moduleDocumentsMeta', `${documents.length} required · View checklist`);
+  setText('#moduleRisksMeta', `${risks.length} identified · View risks`);
   const strategyCount = arr(latestReport.roadmap).length + arr(latestReport.personalizedRecommendations).length;
   const resourceCount = arr(latestReport.learningResources).length;
-  setText('#moduleStrategyMeta', strategyCount ? `${strategyCount} strategy item${strategyCount === 1 ? '' : 's'} Â· View strategy` : 'No strategy data returned');
-  setText('#moduleResourcesMeta', resourceCount ? `${resourceCount} resource${resourceCount === 1 ? '' : 's'} Â· View links` : 'No resources returned');
+  setText('#moduleStrategyMeta', strategyCount ? `${strategyCount} strategy item${strategyCount === 1 ? '' : 's'} · View strategy` : 'No strategy data returned');
+  setText('#moduleResourcesMeta', resourceCount ? `${resourceCount} resource${resourceCount === 1 ? '' : 's'} · View links` : 'No resources returned');
 
   const resumeStrength = numberOrNull(latestReport.resumeStrength?.score);
   const ats = numberOrNull(latestReport.atsReadiness?.score);
-  setText('#resumeStrScore', resumeStrength === null ? 'â€”' : resumeStrength);
-  setText('#atsScore', ats === null ? 'â€”' : ats);
+  setText('#resumeStrScore', resumeStrength === null ? '—' : resumeStrength);
+  setText('#atsScore', ats === null ? '—' : ats);
   const resumeMeter = $('#resumeStrMeter');
   const atsMeter = $('#atsMeter');
   if (resumeMeter) resumeMeter.style.width = resumeStrength === null ? '0%' : `${resumeStrength}%`;
   if (atsMeter) atsMeter.style.width = ats === null ? '0%' : `${ats}%`;
-  setText('#resumeStrLabel', resumeStrength === null ? notAvailable() : resumeStrength >= 75 ? 'Strong resume â€” well-structured and detailed.' : resumeStrength >= 50 ? 'Adequate resume â€” some improvements needed.' : 'Resume quality needs attention.');
-  setText('#atsLabel', ats === null ? notAvailable() : ats >= 75 ? 'Good ATS compatibility â€” your resume should parse well.' : ats >= 50 ? 'Moderate ATS readiness â€” optimize keywords and formatting.' : 'ATS readiness needs attention.');
+  setText('#resumeStrLabel', resumeStrength === null ? notAvailable() : resumeStrength >= 75 ? 'Strong resume — well-structured and detailed.' : resumeStrength >= 50 ? 'Adequate resume — some improvements needed.' : 'Resume quality needs attention.');
+  setText('#atsLabel', ats === null ? notAvailable() : ats >= 75 ? 'Good ATS compatibility — your resume should parse well.' : ats >= 50 ? 'Moderate ATS readiness — optimize keywords and formatting.' : 'ATS readiness needs attention.');
   setHTML('#resumeStrHighlights', list(latestReport.resumeStrength?.highlights, 'No highlights identified.'));
   setHTML('#resumeStrWeaknesses', list(latestReport.resumeStrength?.weaknesses, 'No improvement areas identified.'));
   setHTML('#atsIssues', list(latestReport.atsReadiness?.issues, 'No ATS issues identified.'));
@@ -778,8 +861,8 @@ function reportText() {
   const report = latestReport || {};
   const countsData = statusCounts(report);
   return [
-    'NOVA AI â€” FIT BRIEF',
-    'â•'.repeat(50),
+    'NOVA AI — FIT BRIEF',
+    '\u2015'.repeat(50),
     '',
     `Opportunity: ${report.opportunitySummary?.role || report.opportunityName || ''}`,
     `Organization: ${report.opportunitySummary?.organization || ''}`,
@@ -792,10 +875,10 @@ function reportText() {
     report.whyVerdict || report.finalVerdict || report.verdictReason || '',
     '',
     'TOP STRENGTHS',
-    ...arr(report.strengths).map((item) => `â€¢ ${item}`),
+    ...arr(report.strengths).map((item) => `• ${item}`),
     '',
     'KEY GAPS',
-    ...arr(report.missingSkills).map((item) => `â€¢ ${item.skill} (${item.priority || 'priority'})`),
+    ...arr(report.missingSkills).map((item) => `• ${item.skill} (${item.priority || 'priority'})`),
     '',
     'NEXT BEST ACTION',
     nextBestAction(report),
@@ -817,7 +900,7 @@ $('#pdfBtn')?.addEventListener('click', async () => {
   const report = $('#report');
   if (!report || report.classList.contains('hidden')) return toast('No report to export.');
   if (!window.html2pdf) return window.print();
-  toast('Generating PDFâ€¦');
+  toast('Generating PDF…');
   try { await window.html2pdf().set({ margin: 8, filename: `nova-fit-brief-${Date.now()}.pdf`, image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(report).save(); toast('PDF downloaded.'); } catch { toast('PDF generation failed. Using print instead.'); window.print(); }
 });
 $('#printBtn')?.addEventListener('click', () => window.print());
