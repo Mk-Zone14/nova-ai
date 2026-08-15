@@ -1,0 +1,23 @@
+@media print {
+  :root { color-scheme: light; }
+  body { background: #fff !important; color: #111 !important; }
+  body::before, .site-header, .hero, .trust-strip, .workspace, .loading-panel, .error-card, .theme-toggle, .toast, .report-actions, .history-card, .analysis-dialog, .module-heading, .module-grid, .supplemental-grid { display: none !important; }
+  main, .report { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+  .report { display: block !important; }
+  .report-toolbar { margin-bottom: 18px !important; }
+  .report-toolbar h2, .decision-title-row h3 { color: #111 !important; }
+  .report-toolbar p, .decision-title-row p, .report-context span:last-child, .callout p { color: #444 !important; }
+  .decision-hero, .report-context { border: 1px solid #bbb !important; box-shadow: none !important; background: #fff !important; }
+  .decision-main, .callout, .report-context > div { background: #fff !important; color: #111 !important; }
+  .primary-score strong, .decision-status, .callout.action > span { color: #16724b !important; }
+  .callout.concern > span { color: #98661d !important; }
+  .report-context { margin-bottom: 20px !important; }
+  .supplemental-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; }
+  .supplemental-card { border: 1px solid #bbb !important; background: #fff !important; break-inside: avoid; }
+  .report-card-title, .detail-item { border-color: #ccc !important; }
+  *, *::before, *::after { text-shadow: none !important; }
+  .meter, .meter span { background: #ddd !important; }
+  .meter span { background: #16724b !important; }
+  article, .decision-hero, .report-context, .supplemental-card { page-break-inside: avoid; break-inside: avoid; }
+  h1, h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
+}

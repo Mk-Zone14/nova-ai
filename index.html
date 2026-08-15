@@ -1,0 +1,213 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10131c">
+  <title>Nova AI — Know before you apply</title>
+  <meta name="description" content="Evidence-based opportunity eligibility and application strategy for internships, scholarships, fellowships, competitions, and early-career opportunities.">
+  <script src="theme-init.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="print.css" media="print">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to main content</a>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Nova AI home">
+      <span class="brand-mark"><i data-lucide="hexagon"></i></span>
+      <span><b>Nova</b><small>AI</small></span>
+    </a>
+    <nav class="header-actions" aria-label="Primary navigation">
+      <a href="#how-it-works" class="nav-link">How it works</a>
+      <a href="#workspace" class="nav-link">Analyze</a>
+      <button class="theme-toggle" id="themeToggle" aria-label="Switch theme" aria-pressed="false">
+        <i data-lucide="sun"></i>
+        <i data-lucide="moon"></i>
+        <span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main role="main">
+    <section class="hero" id="top" data-pointer-zone>
+      <canvas class="constellation-field" id="constellationField" aria-hidden="true"></canvas>
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-mark"></span>Nova / Opportunity intelligence</div>
+        <h1>Know before<br>you <em>apply.</em></h1>
+        <p>Your profile. The opportunity. The evidence between them. Nova turns the comparison into a decision you can trust.</p>
+        <div class="hero-notes" aria-label="What Nova compares"><span>Profile + opportunity</span><span>Evidence-led</span><span>Human-readable</span></div>
+        <div class="hero-actions">
+          <a class="hero-cta" href="#workspace">Build my fit brief <i data-lucide="arrow-down-right"></i></a>
+          <a class="hero-secondary" href="#sample-decision">See a sample decision <i data-lucide="arrow-up-right"></i></a>
+        </div>
+      </div>
+      <aside class="sample-decision" id="sample-decision" aria-label="Sample Nova AI decision" data-pointer-card>
+        <div class="sample-decision-top"><span class="mono-label">Live sample / Fit brief</span><span class="status-dot"></span></div>
+        <div class="sample-decision-title"><span>Product Engineering Intern</span><span class="sample-score">82</span></div>
+        <span class="sample-organization">Atlas Labs · Bengaluru / Remote</span>
+        <div class="sample-decision-verdict"><strong>Apply with a plan</strong><span>Fit score</span></div>
+        <p>Strong product experience supports the application. The open question is clearer SQL evidence before submitting.</p>
+        <div class="sample-evidence"><span><b>Evidence</b> SQL · React · shipped project</span><span><b>Next move</b> Verify deployment experience</span></div>
+        <button class="sample-link" id="sampleDecisionHero" type="button">Use this example <i data-lucide="arrow-right"></i></button>
+      </aside>
+    </section>
+
+    <section class="trust-strip" id="how-it-works" aria-label="How Nova AI works">
+      <div><span class="trust-number">01</span><strong>A decision, not a data dump</strong><span>Know where you stand.</span></div>
+      <div><span class="trust-number">02</span><strong>Evidence you can follow</strong><span>See why the model reached it.</span></div>
+      <div><span class="trust-number">03</span><strong>One next move</strong><span>Spend effort where it matters.</span></div>
+    </section>
+
+    <section class="workspace" id="workspace" aria-labelledby="workspace-title">
+      <div class="section-intro">
+        <div>
+          <div class="eyebrow"><span class="eyebrow-mark"></span>Build a fit brief</div>
+          <h2 id="workspace-title">Two sources. One clear decision.</h2>
+        </div>
+        <p>Give Nova the evidence it needs to investigate your fit. Your inputs stay in this browser until you choose to analyze.</p>
+      </div>
+      <div class="sample-tools" aria-label="Sample data">
+        <button class="sample-primary" id="sampleDecisionBtn" type="button">See a sample decision <i data-lucide="sparkles"></i></button>
+        <details class="sample-menu">
+          <summary class="sample-menu-trigger">Choose another sample <i data-lucide="chevron-down"></i></summary>
+          <div class="sample-menu-panel">
+            <button class="sample-chip" data-sample="profile" type="button">Student profile</button>
+            <button class="sample-chip" data-sample="resume" type="button">Resume</button>
+            <button class="sample-chip" data-sample="internship" type="button">Internship</button>
+            <button class="sample-chip" data-sample="scholarship" type="button">Scholarship</button>
+            <button class="sample-chip" data-sample="competition" type="button">Competition</button>
+          </div>
+        </details>
+      </div>
+      <div class="input-grid">
+        <article class="input-card">
+          <div class="input-step-line"><span class="step-badge">01</span><span class="input-state" id="profileState">Waiting for profile</span></div>
+          <div class="card-heading">
+            <div>
+              <label for="profileInput">Your profile or resume</label>
+              <p>Education, skills, projects, experience, and goals.</p>
+            </div>
+            <span class="character-count" id="profileCount">0 / 8,000</span>
+          </div>
+          <textarea id="profileInput" maxlength="8000" aria-label="Student profile or resume" aria-describedby="profileHelp" placeholder="Paste your profile or upload a resume."></textarea>
+          <div class="input-footer" id="profileHelp">
+            <div class="footer-actions">
+              <label class="text-action" for="resumeUpload"><i data-lucide="upload"></i>Upload resume</label>
+              <input id="resumeUpload" type="file" accept=".txt,.md,.pdf,text/plain,application/pdf" hidden>
+              <button class="text-action" id="sampleProfile" type="button">Use sample</button>
+            </div>
+            <span>TXT, MD, or PDF · max 2 MB</span>
+          </div>
+        </article>
+        <article class="input-card">
+          <div class="input-step-line"><span class="step-badge">02</span><span class="input-state" id="opportunityState">Waiting for opportunity</span></div>
+          <div class="card-heading">
+            <div>
+              <label for="opportunityInput">The opportunity brief</label>
+              <p>Paste the complete job, fellowship, scholarship, or competition description.</p>
+            </div>
+            <span class="character-count" id="opportunityCount">0 / 12,000</span>
+          </div>
+          <textarea id="opportunityInput" maxlength="12000" aria-label="Opportunity details" aria-describedby="opportunityHelp" placeholder="Paste the full opportunity description."></textarea>
+          <div class="input-footer" id="opportunityHelp">
+            <button class="text-action" id="sampleOpportunity" type="button">Use sample</button>
+            <span>Requirements, dates, and documents are mapped automatically.</span>
+          </div>
+        </article>
+      </div>
+      <div class="analyze-row">
+        <div class="analysis-note"><span class="pulse-dot"></span><span>Evidence first. No vague advice.</span></div>
+        <div class="analyze-actions">
+          <button class="ghost-button" data-reset type="button">Reset</button>
+          <button class="analyze-button" id="analyzeBtn" type="button"><span>Build my fit brief</span><i data-lucide="arrow-up-right"></i></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="loadingPanel" aria-live="polite" class="loading-panel hidden" aria-labelledby="loadingTitle" aria-busy="true">
+      <div class="loading-head"><div class="orbit"><i data-lucide="scan-search"></i></div><div><div class="eyebrow"><span class="eyebrow-mark"></span>Nova is reading</div><h2 id="loadingTitle">Building your fit brief…</h2><p id="loadingText">Reading opportunity.</p></div></div>
+      <div class="loading-steps" aria-hidden="true"><span class="active">Reading opportunity</span><span>Mapping evidence</span><span>Checking blockers</span><span>Preparing next moves</span></div>
+      <div class="loading-track" aria-hidden="true"><span></span></div>
+      <button class="ghost-button" id="cancelLoading" type="button">Cancel analysis</button>
+    </section>
+
+    <section id="errorCard" role="alert" aria-live="assertive" aria-labelledby="errorTitle" class="error-card hidden" tabindex="-1">
+      <div class="error-icon"><i data-lucide="triangle-alert"></i></div>
+      <div><div class="eyebrow"><span class="eyebrow-mark"></span>Could not complete</div><h2 id="errorTitle" tabindex="-1">We couldn't finish this analysis.</h2><p id="errorMessage">Your inputs are still here. Try again, or edit the opportunity text.</p></div>
+      <button class="secondary-button" id="retryBtn" type="button">Try again</button>
+    </section>
+
+    <section class="report hidden" id="report" aria-labelledby="reportTitle" tabindex="-1">
+      <div class="report-toolbar">
+        <div><div class="eyebrow"><span class="eyebrow-mark"></span>Fit brief</div><h2 id="reportTitle">Your decision</h2><p id="reportSubtitle">A clear view of your fit and the path forward.</p></div>
+        <div class="report-actions" aria-label="Report actions">
+          <button class="secondary-button" id="editInputsBtn" type="button"><i data-lucide="pencil"></i><span>Edit inputs</span></button>
+          <button class="secondary-button" id="copyBtn" type="button"><i data-lucide="copy"></i><span>Copy brief</span></button>
+          <button class="secondary-button" id="jsonBtn" type="button"><i data-lucide="braces"></i><span class="action-wide">JSON</span></button>
+          <button class="secondary-button" id="pdfBtn" type="button"><i data-lucide="file-down"></i><span class="action-wide">PDF</span></button>
+          <button class="secondary-button" id="printBtn" type="button"><i data-lucide="printer"></i><span class="action-wide">Print</span></button>
+          <button class="secondary-button reset" data-reset type="button"><i data-lucide="rotate-ccw"></i><span class="action-wide">New analysis</span></button>
+        </div>
+      </div>
+
+      <div class="decision-hero">
+        <div class="decision-main">
+          <div class="decision-kicker"><span class="decision-status" id="decisionStatusDot"></span><span id="decisionKicker">Your decision</span></div>
+          <div class="decision-title-row"><div><h3 id="execVerdict">Assessment pending</h3><p id="execRecommendation">Your decision-ready overview will appear here.</p></div><div class="primary-score"><strong id="execScore" aria-label="Fit score not available">--</strong><span>FIT SCORE / 100</span></div></div>
+          <div class="decision-stats"><div><span>Eligibility</span><strong id="decisionEligibility">—</strong></div><div><span>Requirements</span><strong id="decisionRequirements">—</strong></div><div><span>Confidence</span><strong id="decisionConfidence">—</strong></div></div>
+          <button class="secondary-button view-analysis-button" id="viewAnalysisBtn" type="button">View evidence <i data-lucide="arrow-down-right"></i></button>
+        </div>
+        <div class="decision-callouts"><div class="callout concern"><span><i data-lucide="alert-triangle"></i>Biggest concern</span><p id="biggestConcern">—</p></div><div class="callout action"><span><i data-lucide="arrow-up-right"></i>Next best action</span><p id="nextBestAction">—</p></div></div>
+      </div>
+
+      <div class="report-context"><div><span class="mono-label">Opportunity</span><strong id="contextOpportunity">—</strong><span id="contextOpportunityMeta">—</span></div><div><span class="mono-label">Candidate</span><strong id="contextCandidate">—</strong><span id="contextCandidateMeta">—</span></div><div><span class="mono-label">Readiness</span><strong id="contextReadiness">—</strong><span id="contextReadinessMeta">Based on supplied evidence</span></div></div>
+
+      <div class="module-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Decision support</div><h3>What matters first</h3></div><p>Decision, evidence, blockers, then next moves.</p></div>
+      <div class="module-grid primary-module-grid" id="moduleGrid">
+        <button class="analysis-module" data-module="requirements" type="button"><span class="module-icon"><i data-lucide="list-checks"></i></span><span><strong>Evidence</strong><small id="moduleRequirementsMeta">View requirement evidence</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
+        <button class="analysis-module" data-module="risks" type="button"><span class="module-icon danger-icon"><i data-lucide="shield-alert"></i></span><span><strong>Blockers</strong><small id="moduleRisksMeta">View risk signals</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
+        <button class="analysis-module" data-module="strategy" type="button"><span class="module-icon accent-icon"><i data-lucide="route"></i></span><span><strong>Next moves</strong><small id="moduleStrategyMeta">View the path forward</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
+        <button class="analysis-module" data-module="strengths" type="button"><span class="module-icon positive-icon"><i data-lucide="sparkles"></i></span><span><strong>Strengths & weaknesses</strong><small id="moduleStrengthsMeta">View candidate signals</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
+      </div>
+
+      <div class="deep-analysis">
+        <div class="module-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Deeper analysis</div><h3>Open only what you need</h3></div><p>Supporting material stays behind focused modules.</p></div>
+        <div class="module-grid deep-module-grid" id="deepModuleGrid">
+          <button class="analysis-module" data-module="gaps" type="button"><span class="module-icon warning-icon"><i data-lucide="scan-search"></i></span><span><strong>Gaps</strong><small id="moduleGapsMeta">View highest-impact gaps</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
+          <button class="analysis-module" data-module="documents" type="button"><span class="module-icon"><i data-lucide="file-check-2"></i></span><span><strong>Documents</strong><small id="moduleDocumentsMeta">View application checklist</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
+          <button class="analysis-module" data-module="resources" type="button"><span class="module-icon accent-icon"><i data-lucide="book-open"></i></span><span><strong>Resources</strong><small id="moduleResourcesMeta">View learning resources</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
+        </div>
+      </div>
+
+      <details class="preparation-details">
+        <summary><span><span class="eyebrow"><span class="eyebrow-mark"></span>Preparation</span><strong>Resume and ATS readiness</strong></span><i data-lucide="chevron-down"></i></summary>
+        <div class="supplemental-grid">
+          <article class="supplemental-card"><div class="report-card-title"><div><span class="mini-icon"><i data-lucide="file-text"></i></span><h3>Resume readiness</h3></div><strong id="resumeStrScore">—</strong></div><div class="meter"><span id="resumeStrMeter"></span></div><p id="resumeStrLabel">Independent resume quality assessment.</p><div class="compact-columns"><div><span class="mono-label">HIGHLIGHTS</span><ul id="resumeStrHighlights" class="insight-list"></ul></div><div><span class="mono-label">IMPROVE</span><ul id="resumeStrWeaknesses" class="insight-list negative-list"></ul></div></div></article>
+          <article class="supplemental-card"><div class="report-card-title"><div><span class="mini-icon"><i data-lucide="scan-line"></i></span><h3>ATS readiness</h3></div><strong id="atsScore">—</strong></div><div class="meter"><span id="atsMeter"></span></div><p id="atsLabel">How well your resume performs with automated screening.</p><div class="compact-columns"><div><span class="mono-label">ISSUES</span><ul id="atsIssues" class="insight-list negative-list"></ul></div><div><span class="mono-label">SUGGESTIONS</span><ul id="atsSuggestions" class="insight-list"></ul></div></div></article>
+        </div>
+      </details>
+
+      <details class="history-card">
+        <summary><span><span class="mini-icon"><i data-lucide="clock-3"></i></span><strong>Saved on this device</strong></span><span class="history-summary-action">View history</span></summary>
+        <div class="history-card-body"><button id="clearHistory" class="text-action" type="button">Clear history</button><div id="historyList" class="history-list"><span class="empty">Your past analyses appear here.</span></div></div>
+      </details>
+    </section>
+  </main>
+
+  <dialog class="analysis-dialog" id="analysisDialog" aria-labelledby="dialogTitle">
+    <div class="dialog-shell"><div class="dialog-header"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Analysis module</div><h2 id="dialogTitle">Evidence</h2><p id="dialogSubtitle">Focused details from your fit brief.</p></div><button class="dialog-close" id="dialogClose" aria-label="Close analysis module" type="button"><i data-lucide="x"></i></button></div><div class="dialog-content" id="dialogContent"></div></div>
+  </dialog>
+
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+  <script src="https://unpkg.com/lucide@0.468.0"></script>
+  <script src="client.js" defer></script>
+</body>
+</html>
+
+
+

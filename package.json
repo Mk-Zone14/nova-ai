@@ -1,0 +1,14 @@
+{
+  "name": "opportunity-copilot-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-powered eligibility analysis for student opportunities.",
+  "scripts": {
+    "dev": "node local-dev.js",
+    "check": "node --check client.js && node --check api/analyze.js && node --check local-dev.js",
+    "lint": "npm run check",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage"
+  },
+  "engines": { "node": "24.x" }
+}
