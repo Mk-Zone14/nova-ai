@@ -2,337 +2,371 @@
 
 > **Know Before You Apply.**
 
-AI-powered eligibility analysis for internships, scholarships, fellowships, competitions, grants, and early-career opportunities.
+Nova AI is an AI-powered opportunity eligibility and application copilot that helps students and early-career candidates understand whether they are a strong fit for internships, scholarships, fellowships, competitions, grants, and other opportunities.
 
-<p align="center">
+Instead of simply asking **"Can I apply?"**, Nova AI helps answer:
 
-![Status](https://img.shields.io/badge/Status-Production%20Ready-success)
-![AI](https://img.shields.io/badge/AI-Groq%20Llama%203.3%2070B-blue)
-![Platform](https://img.shields.io/badge/Platform-Vercel-black)
-![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla%20JS-F7DF1E)
-![Node.js](https://img.shields.io/badge/Backend-Node.js-339933)
-
-</p>
+* **Should I apply?**
+* **How strong is my profile?**
+* **What evidence supports my fit?**
+* **What requirements am I missing?**
+* **What should I improve before applying?**
 
 ---
 
 ## 🌐 Live Demo
 
-**https://promptwars-chi.vercel.app/**
+**[https://nova-ai-delta-five.vercel.app/](https://nova-ai-delta-five.vercel.app/)**
 
 ---
 
-## 📌 Overview
+## ✨ What Nova AI Does
 
-Applying for internships, scholarships, fellowships, competitions, and research programs often involves manually comparing your profile against lengthy eligibility requirements.
+Nova AI takes two inputs:
 
-**Opportunity Copilot** eliminates this friction by using AI to analyze your profile alongside an opportunity description and instantly generate a structured, explainable eligibility report.
+1. **Your profile** — resume, skills, experience, education, projects, and background.
+2. **An opportunity** — internship, scholarship, fellowship, competition, grant, or other opportunity description.
 
-Instead of asking **"Can I apply?"**, the application answers:
+It then uses AI to produce a structured eligibility and application-readiness report.
 
-* ✅ Should you apply?
-* 📊 How strong is your profile?
-* 🎯 What are your chances?
-* 📈 What skills are missing?
-* 🚀 How can you improve?
+### 🧠 Eligibility Intelligence
 
----
-
-# ✨ Features
-
-## 🤖 AI-Powered Eligibility Analysis
-
-* Resume/Profile analysis
-* Opportunity requirement analysis
-* Explainable eligibility verdict
-* AI confidence score
+* Eligibility verdict
 * Match score
-* Application readiness estimation
-* Acceptance probability estimate
-
----
-
-## 📊 Advanced Candidate Intelligence
-
-* Requirement mapping
+* AI confidence score
+* Requirement-by-requirement analysis
+* Candidate strengths
+* Missing requirements
 * Skills gap analysis
 * Hidden requirement detection
-* ATS readiness evaluation
+* Risk analysis
+* Application readiness assessment
+
+### 📄 Resume & ATS Analysis
+
 * Resume quality assessment
-* Candidate strengths
-* Red flags
-* Missing documents checklist
+* ATS compatibility analysis
+* Resume strengths
+* Potential red flags
+* Missing information
+* Improvement recommendations
+* Evidence-based profile analysis
 
----
+### 🚀 Application Copilot
 
-## 🚀 AI Career Assistant
+Nova AI doesn't stop at telling you what you're missing.
+
+It can also provide:
 
 * Personalized improvement roadmap
 * Resume improvement suggestions
-* AI-generated cover letter
+* Cover-letter guidance
 * Interview preparation questions
-* Learning resource recommendations
-* Risk analysis with mitigation strategies
+* Recommended learning resources
+* Skill-building recommendations
+* Risk mitigation strategies
 
 ---
 
-## 📄 File Support
+## 🎯 Why Nova AI?
 
-* Paste resume text
-* Upload TXT files
-* Upload Markdown files
-* Upload PDF resumes
-* Client-side PDF text extraction
+Opportunity applications are often unnecessarily difficult.
 
----
+A candidate may have to read several pages of eligibility requirements, compare them against their resume, identify missing qualifications, determine whether those gaps are deal-breakers, and then decide whether the application is worth their time.
 
-## 📤 Export & Productivity
+Nova AI compresses that process into one structured analysis.
 
-* Export report to PDF
-* Print-friendly reports
-* Copy individual report sections
-* View raw AI JSON
-* Session history using local storage
+The goal isn't to blindly tell you **"yes"** or **"no."**
+
+The goal is to show you **why**.
 
 ---
 
-## 🎨 User Experience
+## 🏗️ Architecture
 
-* Dark Mode
-* Light Mode
-* Theme persistence
-* Responsive design
-* Drag-and-drop uploads
-* Animated loading states
-* Smooth UI transitions
-* Accessible interface
-
----
-
-# 📸 Screenshots
-
-> Add screenshots after uploading them.
+Nova AI uses a lightweight client-server architecture:
 
 ```text
-assets/screenshots/home.png
-
-assets/screenshots/dashboard.png
-
-assets/screenshots/report.png
+User
+ │
+ ▼
+Nova AI Web Interface
+ │
+ ├── Candidate Profile / Resume
+ │
+ └── Opportunity Description
+ │
+ ▼
+Serverless Analysis API
+ │
+ ▼
+Groq LLM
+ │
+ ▼
+Structured Eligibility Analysis
+ │
+ ├── Eligibility
+ ├── Match Score
+ ├── Evidence
+ ├── Skill Gaps
+ ├── ATS Analysis
+ ├── Risks
+ ├── Recommendations
+ └── Learning Resources
+ │
+ ▼
+Interactive Results Dashboard
 ```
 
 ---
 
-# 🎥 Demo
+## 🛠️ Tech Stack
 
-> Add a GIF or short demo video here.
+### Frontend
 
-```text
-assets/demo.gif
-```
-
----
-
-# 🧠 How It Works
-
-1. Paste your resume or student profile.
-2. Paste an internship, scholarship, or opportunity description.
-3. Click **Analyze Eligibility**.
-4. AI evaluates your profile against the opportunity.
-5. Receive a structured report with:
-
-   * Match Score
-   * Eligibility Verdict
-   * Requirement Mapping
-   * Skills Gap Analysis
-   * AI Recommendations
-   * Cover Letter Draft
-   * Interview Preparation
-   * Improvement Roadmap
-
----
-
-# 🏗 Tech Stack
-
-## Frontend
-
+* Vanilla JavaScript
 * HTML5
 * CSS3
-* Vanilla JavaScript
+* Responsive UI
+* Custom design system
+* Dark / light theme support
 
-## Backend
+### Backend
 
 * Node.js
 * Vercel Serverless Functions
-
-## AI
-
 * Groq API
-* Llama 3.3 70B Versatile
+* Structured LLM output validation
 
-## Libraries
+### Development
 
-* PDF.js
-* html2pdf.js
-* Lucide Icons
+* Git
+* GitHub
+* Vercel
+* Node.js
+* Automated test suite
 
 ---
 
-# 📁 Project Structure
+## 🔐 Security
+
+Nova AI is designed with security in mind.
+
+* API credentials are stored in environment variables.
+* `.env` files are excluded from version control.
+* External learning-resource URLs are validated against trusted domains.
+* Dangerous URL schemes such as `javascript:` and `data:` are rejected.
+* External links use `noopener noreferrer`.
+* Security headers are configured through Vercel.
+* User-facing analysis does not expose the underlying API key.
+
+The production API key is stored as a sensitive Vercel environment variable and is never committed to this repository.
+
+---
+
+## 🧪 Testing
+
+The project includes automated tests and syntax validation.
+
+Run the syntax checks:
+
+```bash
+npm run check
+```
+
+Run the test suite:
+
+```bash
+npm run test
+```
+
+Current test status:
 
 ```text
-.
+29 tests
+29 passed
+0 failed
+```
+
+---
+
+## 💻 Run Locally
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Mk-Zone14/nova-ai.git
+cd nova-ai
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure environment variables
+
+Create a `.env.local` file:
+
+```env
+GROQ_API_KEY=your_groq_api_key
+```
+
+### 4. Start the development server
+
+```bash
+npm run dev
+```
+
+The local development server will start using the project's Node.js development configuration.
+
+---
+
+## 📁 Project Structure
+
+```text
+nova-ai/
+│
 ├── api/
 │   └── analyze.js
+│
 ├── test/
-├── index.html
+│
 ├── client.js
-├── local-dev.js
-├── theme-init.js
+├── index.html
 ├── styles.css
-├── refined.css
+├── brand-theme.css
 ├── features.css
 ├── premium.css
-├── disclosure.css
-├── brand-theme.css
+├── refined.css
 ├── motion.css
+├── disclosure.css
 ├── launch-button.css
+├── print.css
+├── theme-init.js
+│
+├── local-dev.js
 ├── package.json
 ├── vercel.json
+├── .env.example
+├── .gitignore
 └── README.md
 ```
 
 ---
 
-# ⚙️ Installation
+## 🔄 Analysis Pipeline
 
-Clone the repository.
+Nova AI follows a structured pipeline rather than simply displaying a raw LLM response.
 
-```bash
-git clone https://github.com/Mk-Zone14/promptwars.git
-cd promptwars
-```
+### 1. Candidate Input
 
-Install dependencies.
+The user provides their profile or resume.
 
-```bash
-npm install
-```
+### 2. Opportunity Input
 
----
+The user provides the opportunity description and requirements.
 
-# 🔑 Environment Variables
+### 3. Requirement Extraction
 
-Create a `.env.local` file.
+The backend identifies relevant requirements and constraints.
 
-```env
-GROQ_API_KEY=your_api_key_here
-```
+### 4. Candidate Matching
 
----
+The candidate profile is compared against the opportunity requirements.
 
-# ▶️ Running Locally
+### 5. Evidence-Based Reasoning
 
-```bash
-npm run dev
-```
+The system evaluates the available evidence rather than relying solely on generic similarity.
 
-The application will start locally on:
+### 6. Structured Output
 
-```
-http://localhost:3000
-```
+The model produces a structured analysis containing eligibility, scores, gaps, risks, recommendations, and supporting information.
+
+### 7. Interactive Results
+
+The frontend turns the structured response into an interactive dashboard.
 
 ---
 
-# 🚀 Deployment
+## 📚 Learning Resources
 
-The project is configured for deployment on **Vercel** using Serverless Functions.
+When skill gaps are identified, Nova AI can recommend resources to help candidates close those gaps.
 
-Simply connect the repository to Vercel, configure the required environment variable (`GROQ_API_KEY`), and deploy.
+Resources may include:
 
----
+* Online courses
+* Documentation
+* Tutorials
+* Technical learning material
+* Open-source contribution guides
 
-# 🔒 Security
-
-* API key stored securely using environment variables
-* Server-side AI requests
-* Client never exposes secrets
-* Strict security headers via `vercel.json`
-* Input validation and error handling
-* Request timeout protection
+Resource links are validated before being rendered as clickable external links.
 
 ---
 
-# ⚡ Performance
+## 🎨 Design
 
-* Framework-free architecture
-* Lightweight Vanilla JavaScript
-* Deferred script loading
-* Lazy-loaded styles
-* Client-side PDF parsing
-* Fast time-to-interactive
-* Optimized for serverless deployment
+Nova AI uses a minimal, application-focused interface designed around:
 
----
-
-# ♿ Accessibility
-
-* Semantic HTML
-* Keyboard-friendly navigation
-* Skip-to-content link
-* ARIA labels
-* Screen reader support
-* Reduced motion support
+* Clear information hierarchy
+* High signal-to-noise ratio
 * Responsive layouts
+* Dark and light themes
+* Accessible interactive states
+* Compact analysis cards
+* Structured result sections
+* Mobile-friendly horizontal resource scrolling
+
+The interface is intentionally designed to feel more like a serious career intelligence tool than a generic AI chatbot.
 
 ---
 
-# 💡 Future Improvements
+## 🚀 Deployment
 
-* User authentication
-* Cloud profile storage
-* OCR for scanned PDFs
-* DOCX export
-* Streaming AI responses
-* Global distributed rate limiting
-* Multi-language support
-* Opportunity comparison
-* Saved application history
+Nova AI is deployed on Vercel.
 
----
+Production deployment:
 
-# 🛠 Development
+**[https://nova-ai-delta-five.vercel.app/](https://nova-ai-delta-five.vercel.app/)**
 
-Useful commands:
+The GitHub repository is:
 
-```bash
-npm install
-npm run dev
-npm test
-npm run check
-```
+**[https://github.com/Mk-Zone14/nova-ai](https://github.com/Mk-Zone14/nova-ai)**
 
 ---
 
-# 📄 License
+## 🗺️ Roadmap
 
-This project is intended for educational, demonstration, and hackathon purposes.
+Potential future improvements include:
+
+* [ ] Resume file upload and parsing
+* [ ] Persistent candidate profiles
+* [ ] Opportunity bookmarking
+* [ ] Application tracking
+* [ ] More sophisticated evidence extraction
+* [ ] Opportunity discovery
+* [ ] Personalized application timelines
+* [ ] Better probability calibration
+* [ ] More learning-resource providers
+* [ ] Authentication and user accounts
+* [ ] Application history and analytics
 
 ---
 
-# 👨💻 Author
+## ⚠️ Disclaimer
 
-Developed as a PromptWars hackathon submission.
+Nova AI provides AI-generated analysis and recommendations.
+
+Eligibility decisions, acceptance probabilities, and other assessments should be treated as **decision-support information**, not guarantees.
+
+Always verify eligibility requirements against the official opportunity documentation before applying.
 
 ---
 
-<p align="center">
+## 📜 License
 
-**Opportunity Copilot**
+This project is currently intended as a personal/portfolio project.
 
-*Know Before You Apply.*
-
-Built with ❤️ using Vanilla JavaScript, Node.js, Groq, and Vercel.
-
-</p>
+All rights reserved unless otherwise specified.
