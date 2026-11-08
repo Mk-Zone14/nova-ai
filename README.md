@@ -154,7 +154,9 @@ Nova AI is designed with security in mind.
 
 * API credentials are stored in environment variables.
 * `.env` files are excluded from version control.
-* External learning-resource URLs are validated against trusted domains.
+* Learning-resource links are never taken from the model verbatim: they resolve to a fixed list of known-good URLs by host or exact provider name (`resource-links.js`).
+* Third-party scripts (pdf.js, html2pdf, lucide) are self-hosted in `vendor/` with recorded SHA-256 hashes, and the CSP allows scripts from this origin only.
+* Rate limiting is shared across serverless instances when Upstash Redis is configured (see below); otherwise it falls back to a per-instance limiter, which does **not** protect your Groq quota on Vercel.
 * Dangerous URL schemes such as `javascript:` and `data:` are rejected.
 * External links use `noopener noreferrer`.
 * Security headers are configured through Vercel.
@@ -183,8 +185,8 @@ npm run test
 Current test status:
 
 ```text
-46 tests
-46 passed
+61 tests
+61 passed
 0 failed
 ```
 
@@ -207,11 +209,13 @@ npm install
 
 ### 3. Configure environment variables
 
-Create a `.env.local` file:
+Copy `.env.example` to `.env.local` and fill in your key:
 
 ```env
 GROQ_API_KEY=your_groq_api_key
 ```
+
+Optional, recommended in production: set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (a free Upstash Redis database works) so the rate limit is shared across all serverless instances. Add the same variables to Vercel for Production and Preview.
 
 ### 4. Start the development server
 
@@ -230,6 +234,8 @@ nova-ai/
 │
 ├── api/
 │   └── analyze.js
+├── lib/                 # eligibility core, prompts, rate limiter
+├── vendor/              # self-hosted third-party scripts + hashes
 │
 ├── test/
 │
@@ -245,6 +251,7 @@ nova-ai/
 ├── launch-button.css
 ├── print.css
 ├── theme-init.js
+├── resource-links.js
 │
 ├── local-dev.js
 ├── package.json

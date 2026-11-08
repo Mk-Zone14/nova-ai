@@ -65,9 +65,50 @@ test('theme initialization is externalized so CSP does not require inline script
   assert.match(theme, /localStorage\.getItem/);
 });
 
-test('third-party icon dependency is version-pinned and downloads release resources safely', () => {
+test('no third-party script is loaded and script execution is limited to this origin', () => {
+  const html = read('index.html');
+  assert.doesNotMatch(html, /<script[^>]+src="https?:\/\//);
+  const config = JSON.parse(read('vercel.json'));
+  const csp = config.headers[0].headers.find((header) => header.key === 'Content-Security-Policy').value;
+  assert.match(csp, /script-src 'self';/);
+  assert.match(csp, /worker-src 'self' blob:;/);
+  assert.doesNotMatch(csp, /cdnjs|unpkg/);
+});
+
+test('vendored scripts are present, referenced, and match their recorded SHA-256', () => {
+  const crypto = require('node:crypto');
+  const manifest = read('vendor/README.md');
+  const html = read('index.html');
+  const files = ['pdf.min.js', 'pdf.worker.min.js', 'html2pdf.bundle.min.js', 'lucide.min.js'];
+  for (const file of files) {
+    const hash = crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'vendor', file))).digest('hex');
+    assert.ok(manifest.includes(`\`${file}\``) && manifest.includes(hash), `${file} does not match vendor/README.md`);
+  }
+  for (const file of ['pdf.min.js', 'html2pdf.bundle.min.js', 'lucide.min.js']) assert.ok(html.includes(`src="vendor/${file}"`), file);
+  assert.match(read('client.js'), /workerSrc = 'vendor\/pdf\.worker\.min\.js'/);
+});
+
+test('icon library is loaded before the client and release resources are revoked after download', () => {
   const html = read('index.html');
   const client = read('client.js');
-  assert.match(html, /lucide@0\.468\.0/);
+  assert.ok(html.indexOf('vendor/lucide.min.js') < html.indexOf('src="client.js"'));
+  assert.ok(html.indexOf('src="resource-links.js"') < html.indexOf('src="client.js"'));
   assert.match(client, /setTimeout\(\(\) => URL\.revokeObjectURL\(objectUrl\), 0\)/);
+});
+
+test('privacy notice names the AI provider and local history next to the analyze button', () => {
+  const html = read('index.html');
+  const note = html.match(/<p class="privacy-note"[^>]*>([\s\S]*?)<\/p>/);
+  assert.ok(note, 'privacy note missing');
+  assert.match(note[1], /Groq/);
+  assert.match(note[1], /this browser only/);
+  assert.ok(html.indexOf('id="privacyNote"') > html.indexOf('id="analyzeBtn"'));
+});
+
+test('local logs are not tracked and .env.example documents every server variable', () => {
+  const example = read('.env.example');
+  for (const name of ['GROQ_API_KEY', 'GROQ_MODEL', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN']) assert.match(example, new RegExp(name));
+  assert.doesNotMatch(example, /=\s*[A-Za-z0-9_-]{20,}/, 'example must not contain real-looking secrets');
+  assert.match(read('.gitignore'), /!\.env\.example/);
+  assert.equal(fs.existsSync(path.join(root, 'nova-dev.log')), false);
 });

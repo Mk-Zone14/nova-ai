@@ -68,7 +68,12 @@ const mimeTypes = {
 };
 
 const server = http.createServer((req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host}`);
+    let url;
+    try {
+        url = new URL(req.url, `http://${req.headers.host}`);
+    } catch {
+        return sendResponse(res, 400, { error: 'Bad request.' });
+    }
 
     if (req.method === 'POST' && url.pathname === '/api/analyze') return handleAnalyze(req, res);
     if (url.pathname === '/api/analyze') return sendResponse(res, 405, { error: 'Method not allowed.' });

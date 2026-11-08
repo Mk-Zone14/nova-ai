@@ -287,7 +287,7 @@ async function extractTextFromPDF(file) {
       toast('PDF reader is loading. Please try again in a moment.');
       return null;
     }
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     if (pdf.numPages > 100) {
       toast('This PDF has too many pages. Please choose a shorter resume.');
@@ -601,73 +601,8 @@ function detailRequirement(x) {
   const mandatory = x.mandatory === true ? '<span class="detail-required">Required</span>' : '';
   return `<details class="detail-item"><summary class="detail-item-header"><strong>${requirementText || 'Requirement'}</strong><span class="detail-status-group">${mandatory}<span class="status-${status.key}">${safe(status.label)}</span></span></summary><p><b>Evidence:</b> ${evidence}</p><p><b>Reasoning:</b> ${reasoning}</p><small><b>Confidence:</b> ${confidence}</small></details>`;
 }
-// Trusted platform base hostnames — LLM-provided URLs are only used if their hostname matches.
-const TRUSTED_RESOURCE_ORIGINS = new Set([
-  'freecodecamp.org', 'developer.mozilla.org', 'coursera.org', 'edx.org',
-  'kaggle.com', 'youtube.com', 'youtu.be', 'ocw.mit.edu', 'developers.google.com',
-  'learn.microsoft.com', 'docs.aws.amazon.com', 'cloud.google.com', 'khanacademy.org',
-  'docs.python.org', 'docs.docker.com', 'git-scm.com', 'reactjs.org', 'react.dev',
-  'typescriptlang.org', 'nodejs.org', 'flask.palletsprojects.com', 'fastapi.tiangolo.com',
-  'postgresql.org', 'sqlite.org', 'redis.io', 'aws.amazon.com', 'azure.microsoft.com',
-  'cloud.google.com', 'figma.com', 'linkedin.com', 'github.com'
-]);
-
-// Provider name -> guaranteed-safe homepage/learn-index URL.
-const PROVIDER_FALLBACK_URLS = {
-  'freecodecamp': 'https://www.freecodecamp.org',
-  'mdn web docs': 'https://developer.mozilla.org',
-  'mdn': 'https://developer.mozilla.org',
-  'mozilla': 'https://developer.mozilla.org',
-  'coursera': 'https://www.coursera.org',
-  'edx': 'https://www.edx.org',
-  'kaggle': 'https://www.kaggle.com/learn',
-  'youtube': 'https://www.youtube.com',
-  'mit opencourseware': 'https://ocw.mit.edu',
-  'mit': 'https://ocw.mit.edu',
-  'google developers': 'https://developers.google.com',
-  'google': 'https://developers.google.com/learn',
-  'microsoft learn': 'https://learn.microsoft.com',
-  'microsoft': 'https://learn.microsoft.com',
-  'aws': 'https://docs.aws.amazon.com',
-  'amazon web services': 'https://docs.aws.amazon.com',
-  'google cloud': 'https://cloud.google.com/learn',
-  'khan academy': 'https://www.khanacademy.org',
-  'khanacademy': 'https://www.khanacademy.org',
-  'typescript': 'https://www.typescriptlang.org/docs/',
-  'react': 'https://react.dev',
-  'node.js': 'https://nodejs.org/en/learn',
-  'nodejs': 'https://nodejs.org/en/learn',
-  'python': 'https://docs.python.org/3/tutorial/',
-  'docker': 'https://docs.docker.com',
-  'git': 'https://git-scm.com/doc',
-  'github': 'https://docs.github.com',
-  'postgresql': 'https://www.postgresql.org/docs/',
-  'redis': 'https://redis.io/docs/',
-  'flask': 'https://flask.palletsprojects.com',
-  'fastapi': 'https://fastapi.tiangolo.com',
-  'figma': 'https://www.figma.com/resources/learn-design/'
-};
-
-function safeResourceUrl(url, provider) {
-  if (url && typeof url === 'string' && url.startsWith('http')) {
-    try {
-      const hostname = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
-      // Exact match or subdomain of trusted origin (e.g. docs.github.com -> github.com)
-      if (TRUSTED_RESOURCE_ORIGINS.has(hostname)) return url;
-      for (const trusted of TRUSTED_RESOURCE_ORIGINS) {
-        if (hostname.endsWith('.' + trusted) || hostname === trusted) return url;
-      }
-    } catch { /* invalid URL — fall through */ }
-  }
-  if (provider && typeof provider === 'string') {
-    const key = provider.toLowerCase().trim();
-    if (PROVIDER_FALLBACK_URLS[key]) return PROVIDER_FALLBACK_URLS[key];
-    for (const [k, v] of Object.entries(PROVIDER_FALLBACK_URLS)) {
-      if (key.includes(k) || k.includes(key.split(' ')[0])) return v;
-    }
-  }
-  return null;
-}
+// Link resolution lives in resource-links.js (loaded before this file) so it can be unit-tested.
+const { safeResourceUrl } = window.NovaResources;
 
 function resourceMarkup(resource) {
   if (!resource || typeof resource !== 'object') return '';

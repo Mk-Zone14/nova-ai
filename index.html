@@ -12,8 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="print.css" media="print">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="vendor/pdf.min.js"></script>
+  <script src="vendor/html2pdf.bundle.min.js"></script>
 </head>
 <body>
   <a class="skip-link" href="#workspace">Skip to main content</a>
@@ -127,6 +127,7 @@
           <button class="analyze-button" id="analyzeBtn" type="button"><span>Build my fit brief</span><i data-lucide="arrow-up-right"></i></button>
         </div>
       </div>
+      <p class="privacy-note" id="privacyNote">Building a brief sends your profile and the opportunity text to Groq, our third-party AI provider. Nova&rsquo;s server does not store them. Your last 10 reports are saved in this browser only, and you can clear them from the history panel. Resumes can contain personal details, so share only what you&rsquo;re comfortable with.</p>
     </section>
 
     <section id="loadingPanel" aria-live="polite" class="loading-panel hidden" aria-labelledby="loadingTitle" aria-busy="true">
@@ -204,7 +205,8 @@
   </dialog>
 
   <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
-  <script src="https://unpkg.com/lucide@0.468.0"></script>
+  <script src="vendor/lucide.min.js"></script>
+  <script src="resource-links.js"></script>
   <script src="client.js" defer></script>
 </body>
 </html>

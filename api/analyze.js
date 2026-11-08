@@ -1,16 +1,13 @@
 const {
     normalizeRequirements, normalizeMatches, computeAssessment, buildDeterministicReport
 } = require('../lib/eligibility');
+const rateLimit = require('../lib/rate-limit');
 const { createExtractPrompt, createMatchPrompt, createNarrativePrompt, NARRATIVE_KEYS } = require('../lib/prompts');
 
 const MAX_PROFILE_LENGTH = 8000;
 const MAX_OPPORTUNITY_LENGTH = 12000;
 const MAX_UPSTREAM_RESPONSE_LENGTH = 1000000;
 const JSON_CONTENT_TYPE = 'application/json';
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX_REQUESTS = 20;
-const MAX_TRACKED_CLIENTS = 1000;
-const requestBuckets = new Map();
 
 // One shared budget for the whole pipeline; keep it under maxDuration in vercel.json.
 const TOTAL_BUDGET_MS = 50_000;
@@ -46,28 +43,6 @@ function readRequestBody(body) {
     if (!body) return {};
     if (typeof body === 'string') return JSON.parse(body);
     return body;
-}
-
-function getClientKey(req) {
-    const forwarded = req.headers?.['x-forwarded-for'];
-    return typeof forwarded === 'string' && forwarded ? forwarded.split(',')[0].trim() : 'unknown';
-}
-
-function isRateLimited(clientKey, now = Date.now()) {
-    if (!requestBuckets.has(clientKey) && requestBuckets.size >= MAX_TRACKED_CLIENTS) {
-        for (const [key, times] of requestBuckets) {
-            if (!times.some((time) => now - time < RATE_LIMIT_WINDOW_MS)) requestBuckets.delete(key);
-        }
-        if (requestBuckets.size >= MAX_TRACKED_CLIENTS) requestBuckets.delete(requestBuckets.keys().next().value);
-    }
-    const requests = (requestBuckets.get(clientKey) || []).filter((time) => now - time < RATE_LIMIT_WINDOW_MS);
-    if (requests.length >= RATE_LIMIT_MAX_REQUESTS) {
-        requestBuckets.set(clientKey, requests);
-        return true;
-    }
-    requests.push(now);
-    requestBuckets.set(clientKey, requests);
-    return false;
 }
 
 function isValidModelResponse(text) {
@@ -202,8 +177,8 @@ async function handler(req, res) {
             return sendJson(res, 400, { error: `Please provide both a profile and an opportunity description (50-${MAX_PROFILE_LENGTH.toLocaleString()} and 50-${MAX_OPPORTUNITY_LENGTH.toLocaleString()} characters respectively).` });
         }
 
-        if (isRateLimited(getClientKey(req))) {
-            res.setHeader('Retry-After', String(Math.ceil(RATE_LIMIT_WINDOW_MS / 1000)));
+        if (await rateLimit.isRateLimited(rateLimit.getClientKey(req))) {
+            res.setHeader('Retry-After', String(Math.ceil(rateLimit.limits.WINDOW_MS / 1000)));
             return sendJson(res, 429, { error: 'Too many analysis requests. Please wait a minute and try again.' });
         }
 
@@ -229,7 +204,7 @@ async function handler(req, res) {
 
 module.exports = handler;
 module.exports.readRequestBody = readRequestBody;
-module.exports.isRateLimited = isRateLimited;
+module.exports.isRateLimited = rateLimit.isRateLimitedLocal;
 module.exports.isValidModelResponse = isValidModelResponse;
-module.exports.resetRateLimits = () => requestBuckets.clear();
-module.exports.limits = { MAX_PROFILE_LENGTH, MAX_OPPORTUNITY_LENGTH, MAX_UPSTREAM_RESPONSE_LENGTH, RATE_LIMIT_MAX_REQUESTS };
+module.exports.resetRateLimits = rateLimit.resetRateLimits;
+module.exports.limits = { MAX_PROFILE_LENGTH, MAX_OPPORTUNITY_LENGTH, MAX_UPSTREAM_RESPONSE_LENGTH, RATE_LIMIT_MAX_REQUESTS: rateLimit.limits.MAX_REQUESTS };
