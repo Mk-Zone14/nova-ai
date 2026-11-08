@@ -185,8 +185,8 @@ npm run test
 Current test status:
 
 ```text
-88 tests
-88 passed
+107 tests
+107 passed
 0 failed
 ```
 
@@ -233,7 +233,8 @@ The local development server will start using the project's Node.js development 
 nova-ai/
 │
 ├── api/
-│   └── analyze.js
+│   ├── analyze.js       # verdict (extract → match → compute)
+│   └── narrative.js     # on-demand insights / cover letter / interview
 ├── lib/                 # eligibility core, prompts, rate limiter
 ├── vendor/              # self-hosted third-party scripts + hashes
 │
@@ -276,7 +277,7 @@ The verdict and score are computed **in code**, not by the model. The LLM only p
    * Otherwise → **Eligible**
    * Fit score = weighted share of earned credit (hard ×3, mandatory ×2, preferred ×1; Matched = 1, Partial = 0.5, Missing/Unknown = 0)
    * **Evidence coverage** = % of requirements backed by a verified quote
-4. **Narrative** — cover letter, roadmap, interview questions, resources and resume feedback are generated last, told the computed statuses are final, and cannot set the verdict or any score. If this step fails, the verified verdict is still returned.
+4. **Narrative (on demand, separate endpoint `/api/narrative`)** — the verdict is returned after steps 1–3 only (two model calls), so it appears within seconds. The browser then loads **insights** (strengths, gaps, risks, documents, resources, resume/ATS feedback) automatically in the background, and generates the **cover letter** and **interview questions** only when you click the button. Each section is told the computed statuses are final and cannot set the verdict or any score. The browser sends the verified verdict and requirement statuses back with each request; the server re-validates that payload (shape, allowed statuses, size) and strips any fields a section isn't allowed to return. If a section fails, the verdict is unaffected and the section can be retried. Your profile and opportunity text are kept in memory only for that, never written to local history, so an analysis restored from history shows what was already generated but cannot generate more.
 
 Known limits: the ATS and resume-strength scores are still model-estimated, and "Eligible" with zero hard requirements flagged means nothing disqualifying was *checked*, not that nothing exists. Always confirm against the official criteria.
 

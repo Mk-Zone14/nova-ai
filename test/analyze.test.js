@@ -159,7 +159,7 @@ test('rejects malformed model output before it reaches the client', async () => 
   assert.equal(res.statusCode, 502);
 });
 
-test('runs extract, match and narrative stages and returns a code-computed report', async () => {
+test('returns a code-computed verdict from exactly two model calls and no narrative writing', async () => {
   process.env.GROQ_API_KEY = 'test-key';
   const calls = [];
   const prompts = [];
@@ -172,11 +172,11 @@ test('runs extract, match and narrative stages and returns a code-computed repor
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Cache-Control'], 'no-store');
   assert.equal(res.headers['X-Content-Type-Options'], 'nosniff');
-  assert.deepEqual(calls, ['EXTRACT', 'MATCH', 'NARRATIVE']);
+  assert.deepEqual(calls, ['EXTRACT', 'MATCH'], 'the slow writing must not block the verdict');
   for (const body of prompts) {
     assert.equal(body.temperature, 0.2);
     assert.match(body.messages[0].content, /Return ONLY valid JSON/);
-    assert.match(body.messages[0].content, /untrusted reference data/);
+    assert.match(body.messages[0].content, /untrusted/);
   }
 
   const out = report(res);
@@ -184,16 +184,16 @@ test('runs extract, match and narrative stages and returns a code-computed repor
   assert.equal(out.overallMatchScore, 83); // (3 + 2) / (3 + 2 + 1)
   assert.equal(out.evidenceCoverage, 67); // 2 of 3 requirements have a verified quote
   assert.equal(out.confidenceScore, out.evidenceCoverage);
-  assert.equal(out.coverLetter, 'Dear Atlas Labs,');
-  assert.equal(out.narrativeAvailable, true);
-  assert.equal(out.acceptanceProbability, undefined, 'model-supplied probability must be dropped');
   assert.equal(out.requirementMapping.length, 3);
+  for (const key of ['coverLetter', 'interviewQuestions', 'strengths', 'learningResources', 'acceptanceProbability', 'narrativeAvailable']) {
+    assert.equal(out[key], undefined, `${key} belongs to /api/narrative`);
+  }
 });
 
 test('fabricated profile evidence is downgraded and blocks an Eligible verdict', async () => {
   process.env.GROQ_API_KEY = 'test-key';
   const fabricated = { matches: [{ ...MATCH.matches[0], evidenceQuote: 'Final-year undergraduate at MIT' }, ...MATCH.matches.slice(1)] };
-  global.fetch = stagedFetch({ EXTRACT, MATCH: fabricated, NARRATIVE });
+  global.fetch = stagedFetch({ EXTRACT, MATCH: fabricated });
   const out = report(await run());
   assert.equal(out.eligibilityVerdict, 'Needs verification');
   const row = out.requirementMapping.find((item) => item.hardEligibility);
@@ -205,22 +205,11 @@ test('fabricated profile evidence is downgraded and blocks an Eligible verdict',
 test('requirements whose source quote is not in the opportunity text are dropped', async () => {
   process.env.GROQ_API_KEY = 'test-key';
   const invented = { requirements: [...EXTRACT.requirements, { requirement: 'Must hold a PhD', sourceQuote: 'applicants must hold a PhD', mandatory: true, hardEligibility: true }] };
-  global.fetch = stagedFetch({ EXTRACT: invented, MATCH, NARRATIVE });
+  global.fetch = stagedFetch({ EXTRACT: invented, MATCH });
   const out = report(await run());
   assert.equal(out.requirementMapping.length, 3);
   assert.equal(out.eligibilityVerdict, 'Eligible');
   assert.equal(out._evidenceTrace.droppedRequirements.length, 1);
-});
-
-test('a narrative-stage failure keeps the verified verdict', async () => {
-  process.env.GROQ_API_KEY = 'test-key';
-  global.fetch = stagedFetch({ EXTRACT, MATCH, NARRATIVE: 'not json' });
-  const res = await run();
-  assert.equal(res.statusCode, 200);
-  const out = report(res);
-  assert.equal(out.narrativeAvailable, false);
-  assert.equal(out.eligibilityVerdict, 'Eligible');
-  assert.equal(out.coverLetter, undefined);
 });
 
 test('returns 422 when no verifiable requirements can be extracted', async () => {

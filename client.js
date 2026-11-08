@@ -9,7 +9,8 @@ const $$ = (selector) => document.querySelectorAll(selector);
 // Pure report logic lives in report-model.js (loaded before this file) so it can be unit-tested.
 const {
   safe, arr, notAvailable, numberOrNull, adaptNovaReport, friendlyError, list, presentationText,
-  humanizeVerdict, statusCounts, biggestConcern, nextBestAction, contextCandidate, moduleContent
+  humanizeVerdict, statusCounts, biggestConcern, nextBestAction, contextCandidate, moduleContent,
+  buildAssessmentPayload, mergeNarrative, hasInsights
 } = window.NovaReport;
 const storage = {
   get(key) {
@@ -37,6 +38,10 @@ let abortController = null;
 let phaseTimer = null;
 let latestReport = null;
 let latestReportSaved = false;
+let latestHistoryId = null;
+// Background (on-demand) sections. `inputs` stays in memory only — never written to storage —
+// so a report restored from history cannot request more (canGenerate is false for it).
+const narrative = { runId: 0, inputs: null, status: {}, controllers: new Set() };
 
 function icons() {
   window.lucide?.createIcons();
@@ -398,6 +403,9 @@ async function runAnalysis() {
   if (opportunity.length < 50) { toast('The opportunity description seems too short. Paste the full description.'); return; }
   $('#errorCard')?.classList.add('hidden');
   $('#report')?.classList.add('hidden');
+  resetNarrative(null);
+  latestReportSaved = false;
+  latestHistoryId = null;
   startLoading();
   abortController = new AbortController();
   try {
@@ -411,7 +419,7 @@ async function runAnalysis() {
     try { data = await response.json(); } catch { throw new Error('The analysis response was not readable.'); }
     if (!response.ok) throw new Error(data.error || 'The analysis could not be completed.');
     if (!data.response) throw new Error('The analysis returned no result.');
-    renderReport(adaptNovaReport(data), { save: true });
+    renderReport(adaptNovaReport(data), { save: true, inputs: { profile, opportunity } });
   } catch (error) {
     if (error.name === 'AbortError') return;
     const message = friendlyError(error.message);
@@ -446,22 +454,35 @@ function setHTML(selector, html) {
 }
 
 const dialog = $('#analysisDialog');
-function closeDialog() { if (dialog?.open) dialog.close(); }
-function openModule(module) {
-  if (!latestReport) return;
-  const content = moduleContent(module, latestReport);
+let activeModule = null;
+function closeDialog() { activeModule = null; if (dialog?.open) dialog.close(); }
+function paintModule(module) {
+  const content = moduleContent(module, latestReport, uiState());
   setText('#dialogTitle', content.title);
   setText('#dialogSubtitle', content.subtitle);
   setHTML('#dialogContent', content.html);
   icons();
+}
+function openModule(module) {
+  if (!latestReport) return;
+  activeModule = module;
+  paintModule(module);
   if (typeof dialog?.showModal === 'function') dialog.showModal();
   else dialog?.setAttribute('open', '');
-  $('#coverLetterCopy')?.addEventListener('click', () => {
-    const text = latestReport?.coverLetter || '';
-    navigator.clipboard?.writeText(text).then(() => toast('Cover letter copied.'), () => toast('Could not copy the cover letter.'));
-  });
   $('#dialogClose')?.focus();
 }
+// One delegated handler: the dialog body is re-rendered whenever a background section arrives.
+$('#dialogContent')?.addEventListener('click', (event) => {
+  const target = event.target instanceof Element ? event.target.closest('#coverLetterCopy, [data-action]') : null;
+  if (!target) return;
+  if (target.id === 'coverLetterCopy') {
+    const text = latestReport?.coverLetter || '';
+    navigator.clipboard?.writeText(text).then(() => toast('Cover letter copied.'), () => toast('Could not copy the cover letter.'));
+    return;
+  }
+  const section = { 'generate-cover-letter': 'coverLetter', 'generate-interview': 'interview', 'retry-insights': 'insights' }[target.dataset.action];
+  if (section) loadSection(section);
+});
 $$('[data-module]').forEach((button) => button.addEventListener('click', () => openModule(button.dataset.module)));
 $('#viewAnalysisBtn')?.addEventListener('click', () => {
   $('#moduleGrid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -496,73 +517,154 @@ function saveHistory(report) {
   const title = report?.opportunitySummary?.role || report?.opportunityName || 'Analysis';
   const entry = { id: Date.now(), title, score: numberOrNull(report?.overallMatchScore), verdict: humanizeVerdict(report?.eligibilityVerdict || 'Analysis'), timestamp: new Date().toLocaleString(), report };
   storage.set('ocopilot-history', JSON.stringify([entry, ...existing].slice(0, 10)));
+  return entry.id;
+}
+function updateHistory(id, report) {
+  if (id == null) return;
+  const entries = historyEntries();
+  const index = entries.findIndex((item) => item.id === id);
+  if (index === -1) return;
+  entries[index] = { ...entries[index], score: numberOrNull(report?.overallMatchScore), report };
+  storage.set('ocopilot-history', JSON.stringify(entries));
 }
 $('#clearHistory')?.addEventListener('click', () => { storage.remove('ocopilot-history'); renderHistory(); toast('History cleared from this device.'); });
 
-function renderReport(report, { save = false } = {}) {
-  latestReport = report || {};
-  window.latestReport = latestReport;
-  const countsData = statusCounts(latestReport);
-  const fit = numberOrNull(latestReport.overallMatchScore);
-  const readiness = numberOrNull(latestReport.applicationReadiness);
-  const confidence = numberOrNull(latestReport.confidenceScore);
-  const candidate = contextCandidate(latestReport);
-  const role = latestReport.opportunitySummary?.role || latestReport.opportunityName || 'Eligibility assessment';
-  const organization = latestReport.opportunitySummary?.organization || 'Opportunity';
-  const verdict = humanizeVerdict(latestReport.eligibilityVerdict || 'Assessment pending');
-  const strengths = arr(latestReport.strengths);
-  const gaps = arr(latestReport.missingSkills);
-  const risks = arr(latestReport.riskAnalysis);
-  const documents = arr(latestReport.requiredDocuments);
-
+// ---- on-demand sections ----------------------------------------------------------------------
+function resetNarrative(inputs) {
+  narrative.runId += 1;
+  narrative.controllers.forEach((controller) => controller.abort());
+  narrative.controllers.clear();
+  narrative.inputs = inputs;
+  narrative.status = {};
+}
+function uiState() {
+  const state = { ...narrative.status, canGenerate: Boolean(narrative.inputs) };
+  if (!state.insights && latestReport && !hasInsights(latestReport)) state.insights = narrative.inputs ? 'loading' : 'unavailable';
+  return state;
+}
+function renderInsightPanels() {
+  const report = latestReport || {};
+  const candidate = contextCandidate(report);
+  const role = report.opportunitySummary?.role || report.opportunityName || 'Eligibility assessment';
+  const organization = report.opportunitySummary?.organization || 'Opportunity';
   setText('#reportTitle', role);
   setText('#reportSubtitle', `${organization} · evidence-based candidate analysis`);
-  setText('#execVerdict', verdict);
-  setText('#execRecommendation', latestReport.executiveRecommendation || latestReport.verdictReason || latestReport.finalVerdict || 'Your decision-ready overview will appear here.');
-  countTo($('#execScore'), fit);
-  setText('#decisionEligibility', verdict);
-  setText('#decisionRequirements', countsData.total ? `${countsData.met} / ${countsData.total}` : 'Not mapped');
-  setText('#decisionConfidence', confidence === null ? notAvailable() : `${confidence}%`);
-  setText('#biggestConcern', biggestConcern(latestReport));
-  setText('#nextBestAction', nextBestAction(latestReport));
   setText('#contextOpportunity', role);
-  setText('#contextOpportunityMeta', [organization, latestReport.opportunitySummary?.deadline].filter(Boolean).join(' · ') || 'Opportunity brief analyzed');
+  setText('#contextOpportunityMeta', [organization, report.opportunitySummary?.deadline].filter(Boolean).join(' · ') || 'Opportunity brief analyzed');
   setText('#contextCandidate', candidate.name);
   setText('#contextCandidateMeta', candidate.meta);
-  setText('#contextReadiness', latestReport.readinessCategory ? presentationText(latestReport.readinessCategory) : (readiness === null ? notAvailable() : `${readiness}% ready`));
-  setText('#moduleRequirementsMeta', countsData.total ? `${countsData.met} / ${countsData.total} matched · View evidence` : 'No requirements mapped');
-  const weaknessCount = arr(latestReport.weaknesses).length;
-  setText('#moduleStrengthsMeta', `${strengths.length} strength${strengths.length === 1 ? '' : 's'} · ${weaknessCount} weakness${weaknessCount === 1 ? '' : 'es'} · View evidence`);
-  setText('#moduleGapsMeta', `${gaps.length} important gap${gaps.length === 1 ? '' : 's'} · View analysis`);
-  setText('#moduleDocumentsMeta', `${documents.length} required · View checklist`);
-  setText('#moduleRisksMeta', `${risks.length} identified · View risks`);
-  const strategyCount = arr(latestReport.roadmap).length + arr(latestReport.personalizedRecommendations).length;
-  const resourceCount = arr(latestReport.learningResources).length;
-  setText('#moduleStrategyMeta', strategyCount ? `${strategyCount} strategy item${strategyCount === 1 ? '' : 's'} · View strategy` : 'No strategy data returned');
-  setText('#moduleResourcesMeta', resourceCount ? `${resourceCount} resource${resourceCount === 1 ? '' : 's'} · View links` : 'No resources returned');
+  const pending = ['loading', 'error', 'unavailable'].includes(uiState().insights);
+  const status = uiState().insights;
+  const countsData = statusCounts(report);
+  const strengths = arr(report.strengths);
+  const gaps = arr(report.missingSkills);
+  const risks = arr(report.riskAnalysis);
+  const documents = arr(report.requiredDocuments);
+  const waiting = { loading: 'Preparing…', error: 'Could not be prepared · Open to retry', unavailable: 'Not saved with this analysis' }[status];
 
-  const resumeStrength = numberOrNull(latestReport.resumeStrength?.score);
-  const ats = numberOrNull(latestReport.atsReadiness?.score);
+  setText('#moduleRequirementsMeta', countsData.total ? `${countsData.met} / ${countsData.total} matched · View evidence` : 'No requirements mapped');
+  if (pending) {
+    ['Strengths', 'Gaps', 'Documents', 'Risks', 'Resources'].forEach((name) => setText(`#module${name}Meta`, waiting));
+    setText('#moduleStrategyMeta', 'Cover letter · Interview prep · On request');
+  } else {
+    const weaknessCount = arr(report.weaknesses).length;
+    setText('#moduleStrengthsMeta', `${strengths.length} strength${strengths.length === 1 ? '' : 's'} · ${weaknessCount} weakness${weaknessCount === 1 ? '' : 'es'} · View evidence`);
+    setText('#moduleGapsMeta', `${gaps.length} important gap${gaps.length === 1 ? '' : 's'} · View analysis`);
+    setText('#moduleDocumentsMeta', `${documents.length} required · View checklist`);
+    setText('#moduleRisksMeta', `${risks.length} identified · View risks`);
+    const resourceCount = arr(report.learningResources).length;
+    setText('#moduleResourcesMeta', resourceCount ? `${resourceCount} resource${resourceCount === 1 ? '' : 's'} · View links` : 'No resources returned');
+    setText('#moduleStrategyMeta', 'Strategy · Cover letter · Interview prep');
+  }
+
+  const concern = biggestConcern(report);
+  setText('#biggestConcern', pending && concern === notAvailable() ? waiting : concern);
+  const action = nextBestAction(report);
+  setText('#nextBestAction', pending && action === notAvailable() ? waiting : action);
+
+  const resumeStrength = pending ? null : numberOrNull(report.resumeStrength?.score);
+  const ats = pending ? null : numberOrNull(report.atsReadiness?.score);
   setText('#resumeStrScore', resumeStrength === null ? '—' : resumeStrength);
   setText('#atsScore', ats === null ? '—' : ats);
   const resumeMeter = $('#resumeStrMeter');
   const atsMeter = $('#atsMeter');
   if (resumeMeter) resumeMeter.style.width = resumeStrength === null ? '0%' : `${resumeStrength}%`;
   if (atsMeter) atsMeter.style.width = ats === null ? '0%' : `${ats}%`;
-  setText('#resumeStrLabel', resumeStrength === null ? notAvailable() : resumeStrength >= 75 ? 'Strong resume — well-structured and detailed.' : resumeStrength >= 50 ? 'Adequate resume — some improvements needed.' : 'Resume quality needs attention.');
-  setText('#atsLabel', ats === null ? notAvailable() : ats >= 75 ? 'Good ATS compatibility — your resume should parse well.' : ats >= 50 ? 'Moderate ATS readiness — optimize keywords and formatting.' : 'ATS readiness needs attention.');
-  setHTML('#resumeStrHighlights', list(latestReport.resumeStrength?.highlights, 'No highlights identified.'));
-  setHTML('#resumeStrWeaknesses', list(latestReport.resumeStrength?.weaknesses, 'No improvement areas identified.'));
-  setHTML('#atsIssues', list(latestReport.atsReadiness?.issues, 'No ATS issues identified.'));
-  setHTML('#atsSuggestions', list(latestReport.atsReadiness?.suggestions, 'No ATS suggestions identified.'));
+  setText('#resumeStrLabel', pending ? waiting : resumeStrength === null ? notAvailable() : resumeStrength >= 75 ? 'Strong resume — well-structured and detailed.' : resumeStrength >= 50 ? 'Adequate resume — some improvements needed.' : 'Resume quality needs attention.');
+  setText('#atsLabel', pending ? waiting : ats === null ? notAvailable() : ats >= 75 ? 'Good ATS compatibility — your resume should parse well.' : ats >= 50 ? 'Moderate ATS readiness — optimize keywords and formatting.' : 'ATS readiness needs attention.');
+  setHTML('#resumeStrHighlights', pending ? '' : list(report.resumeStrength?.highlights, 'No highlights identified.'));
+  setHTML('#resumeStrWeaknesses', pending ? '' : list(report.resumeStrength?.weaknesses, 'No improvement areas identified.'));
+  setHTML('#atsIssues', pending ? '' : list(report.atsReadiness?.issues, 'No ATS issues identified.'));
+  setHTML('#atsSuggestions', pending ? '' : list(report.atsReadiness?.suggestions, 'No ATS suggestions identified.'));
+}
+function refreshNarrativeUI() {
+  renderInsightPanels();
+  if (!activeModule || !dialog?.open) return;
+  const content = $('#dialogContent');
+  const hadFocus = content?.contains(document.activeElement);
+  paintModule(activeModule);
+  if (hadFocus && !content.contains(document.activeElement)) $('#dialogClose')?.focus();
+}
+async function loadSection(section) {
+  if (!latestReport || !narrative.inputs || narrative.status[section] === 'loading') return;
+  const run = narrative.runId;
+  const controller = new AbortController();
+  narrative.controllers.add(controller);
+  narrative.status[section] = 'loading';
+  refreshNarrativeUI();
+  try {
+    const response = await fetch('/api/narrative', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...narrative.inputs, section, assessment: buildAssessmentPayload(latestReport) }),
+      signal: controller.signal
+    });
+    let body = {};
+    try { body = await response.json(); } catch { throw new Error('The response was not readable.'); }
+    if (!response.ok) throw new Error(body.error || 'This section could not be generated.');
+    if (run !== narrative.runId) return;
+    if (body.section !== section || !body.data || typeof body.data !== 'object') throw new Error('This section returned no result.');
+    latestReport = mergeNarrative(latestReport, body.data, section);
+    window.latestReport = latestReport;
+    delete narrative.status[section];
+    updateHistory(latestHistoryId, latestReport);
+  } catch (error) {
+    if (error.name === 'AbortError' || run !== narrative.runId) return;
+    narrative.status[section] = 'error';
+    if (section !== 'insights') toast(friendlyError(error.message));
+  } finally {
+    narrative.controllers.delete(controller);
+    if (run === narrative.runId) refreshNarrativeUI();
+  }
+}
+
+function renderReport(report, { save = false, inputs = null } = {}) {
+  latestReport = report || {};
+  window.latestReport = latestReport;
+  const countsData = statusCounts(latestReport);
+  const fit = numberOrNull(latestReport.overallMatchScore);
+  const readiness = numberOrNull(latestReport.applicationReadiness);
+  const confidence = numberOrNull(latestReport.confidenceScore);
+  const verdict = humanizeVerdict(latestReport.eligibilityVerdict || 'Assessment pending');
+
+  resetNarrative(inputs);
+  setText('#execVerdict', verdict);
+  setText('#execRecommendation', latestReport.executiveRecommendation || latestReport.verdictReason || latestReport.finalVerdict || 'Your decision-ready overview will appear here.');
+  countTo($('#execScore'), fit);
+  setText('#decisionEligibility', verdict);
+  setText('#decisionRequirements', countsData.total ? `${countsData.met} / ${countsData.total}` : 'Not mapped');
+  setText('#decisionConfidence', confidence === null ? notAvailable() : `${confidence}%`);
+  setText('#contextReadiness', latestReport.readinessCategory ? presentationText(latestReport.readinessCategory) : (readiness === null ? notAvailable() : `${readiness}% ready`));
+  renderInsightPanels();
 
   document.body.classList.remove('analysis-mode');
   document.body.classList.add('report-mode');
   $('#workspace')?.classList.add('hidden');
   $('#report')?.classList.remove('hidden');
   $('#errorCard')?.classList.add('hidden');
-  if (save && !latestReportSaved) { saveHistory(latestReport); latestReportSaved = true; renderHistory(); }
+  if (save && !latestReportSaved) { latestHistoryId = saveHistory(latestReport); latestReportSaved = true; renderHistory(); }
   icons();
+  if (inputs) loadSection('insights');
   window.requestAnimationFrame(() => $('#report')?.focus({ preventScroll: true }));
 }
 
@@ -591,6 +693,8 @@ function reset() {
   opportunityInput.value = '';
   latestReport = null;
   latestReportSaved = false;
+  latestHistoryId = null;
+  resetNarrative(null);
   counts();
   closeDialog();
   showWorkspace();

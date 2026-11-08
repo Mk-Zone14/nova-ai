@@ -7,7 +7,8 @@ const { STATUS, VERDICT, normalizeRequirements, normalizeMatches, computeAssessm
 const {
   safe, arr, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError, list, presentationText, normalizeStatus,
   humanizeVerdict, requirementItems, statusCounts, biggestConcern, nextBestAction, contextCandidate,
-  detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText
+  detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
+  buildAssessmentPayload, mergeNarrative, hasInsights
 } = model;
 
 const MODULES = ['requirements', 'strengths', 'gaps', 'documents', 'risks', 'strategy', 'resources'];
@@ -283,7 +284,7 @@ test('moduleContent shows honest empty states for an empty report and a default 
   assert.match(moduleContent('documents', empty).html, /No documents were identified/);
   assert.match(moduleContent('risks', empty).html, /No significant risks/);
   assert.match(moduleContent('resources', empty).html, /No resources were generated/);
-  assert.match(moduleContent('strategy', empty).html, /No cover letter was generated/);
+  assert.match(moduleContent('strategy', empty).html, /data-action="generate-cover-letter"/, 'offers to draft rather than claiming none exists');
   assert.equal(moduleContent('nope', empty).title, 'Evidence');
 });
 
@@ -315,4 +316,88 @@ test('buildReportText produces the plain-text brief and survives an empty report
   const empty = buildReportText();
   assert.match(empty, /Fit score: Not available from Nova\./);
   assert.match(empty, /Requirements: 0\/0 matched/);
+});
+
+// ---- on-demand sections ----------------------------------------------------------------------
+
+test('strategy offers Generate buttons, then loading, error and ready states per draft', () => {
+  const base = adaptNovaReport({});
+  const idle = strategyMarkup(base);
+  assert.match(idle, /data-action="generate-cover-letter"/);
+  assert.match(idle, /data-action="generate-interview"/);
+  assert.doesNotMatch(idle, /id="coverLetterCopy"/);
+
+  const loading = strategyMarkup(base, { coverLetter: 'loading', interview: 'loading' });
+  assert.match(loading, /Drafting your cover letter/);
+  assert.match(loading, /Preparing interview questions/);
+  assert.doesNotMatch(loading, /data-action="generate-/);
+
+  const failed = strategyMarkup(base, { coverLetter: 'error' });
+  assert.match(failed, /Couldn(?:'|&#039;)t draft the cover letter/);
+  assert.match(failed, /data-action="generate-cover-letter"/, 'error state offers retry');
+
+  const saved = strategyMarkup(base, { canGenerate: false });
+  assert.match(saved, /Run a new analysis/);
+  assert.doesNotMatch(saved, /data-action="generate-/);
+
+  const ready = adaptNovaReport({ coverLetter: 'Dear team,\nHello.', interviewQuestions: [{ question: 'Why us?', whyAsked: 'Fit', suggestedAnswer: 'Because <b>x</b>' }] });
+  const html = strategyMarkup(ready, { coverLetter: 'loading' });
+  assert.match(html, /id="coverLetterCopy"/, 'existing content wins over a stale loading flag');
+  assert.match(html, /Why us\?/);
+  assert.doesNotMatch(html, /<b>x<\/b>/, 'model text is escaped');
+  assertSafeMarkup(html, 'strategy ready');
+});
+
+test('insight-dependent modules show pending and retry panels until insights arrive', () => {
+  for (const module of ['strengths', 'gaps', 'documents', 'risks', 'resources']) {
+    assert.match(moduleContent(module, adapted(), { insights: 'loading' }).html, /still preparing/i, module);
+    assert.match(moduleContent(module, adapted(), { insights: 'error' }).html, /data-action="retry-insights"/, module);
+  }
+  assert.equal(moduleContent('requirements', adapted(), { insights: 'loading' }).title, 'Requirements', 'verdict-backed modules never wait');
+  assert.doesNotMatch(moduleContent('requirements', adapted(), { insights: 'loading' }).html, /still preparing/i);
+  const strategy = moduleContent('strategy', adaptNovaReport({}), { insights: 'loading' }).html;
+  assert.match(strategy, /still preparing/i);
+  assert.match(strategy, /data-action="generate-cover-letter"/, 'drafts do not depend on insights');
+});
+
+test('buildAssessmentPayload sends only verified verdict data in the canonical shape the server expects', () => {
+  const report = adapted();
+  const payload = buildAssessmentPayload(report);
+  assert.equal(payload.verdict, report.eligibilityVerdict);
+  assert.ok(payload.rows.length >= 1 && payload.rows.length <= 25);
+  for (const row of payload.rows) {
+    assert.ok(['Matched', 'Partial Match', 'Missing', 'Unknown'].includes(row.status), row.status);
+    assert.equal(typeof row.hardEligibility, 'boolean');
+    assert.equal(typeof row.mandatory, 'boolean');
+    assert.ok(row.requirement.length > 0 && row.requirement.length <= 300);
+    assert.deepEqual(Object.keys(row).sort(), ['hardEligibility', 'mandatory', 'requirement', 'status']);
+  }
+  const { validateAssessment } = require('../lib/narrative');
+  assert.ok(validateAssessment(payload), 'payload passes the server validator unchanged');
+});
+
+test('mergeNarrative folds generated sections in without losing the verdict', () => {
+  const report = adapted();
+  const merged = mergeNarrative(report, { coverLetter: 'Dear team', interviewQuestions: [{ question: 'Q' }] });
+  assert.equal(merged.coverLetter, 'Dear team');
+  assert.equal(merged.interviewQuestions.length, 1);
+  assert.equal(merged.eligibilityVerdict, report.eligibilityVerdict);
+  assert.equal(merged.overallMatchScore, report.overallMatchScore);
+  assert.equal(mergeNarrative(report, null).eligibilityVerdict, report.eligibilityVerdict);
+  assert.equal(mergeNarrative(report, ['x']).coverLetter, report.coverLetter, 'arrays are ignored');
+});
+
+test('unavailable insights explain why instead of showing misleading empty states', () => {
+  const html = moduleContent('risks', adapted(), { insights: 'unavailable' });
+  assert.match(html.html, /weren.t saved/);
+  assert.doesNotMatch(html.html, /data-action/, 'nothing to retry without the original inputs');
+  assert.equal(html.subtitle, 'Not saved with this analysis');
+});
+
+test('hasInsights recognises generated sections, legacy reports, and a verdict-only report', () => {
+  assert.equal(hasInsights(adaptNovaReport({})), false);
+  assert.equal(hasInsights(adapted()), true, 'reports from before the split already carry insights');
+  const verdictOnly = adaptNovaReport({ eligibilityVerdict: 'Eligible' });
+  assert.equal(hasInsights(mergeNarrative(verdictOnly, {}, 'insights')), true, 'an insights section that legitimately found nothing is still generated');
+  assert.equal(hasInsights(mergeNarrative(verdictOnly, { coverLetter: 'x' }, 'coverLetter')), false);
 });

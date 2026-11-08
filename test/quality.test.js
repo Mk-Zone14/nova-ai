@@ -117,3 +117,13 @@ test('local logs are not tracked and .env.example documents every server variabl
   assert.match(read('.gitignore'), /!\.env\.example/);
   assert.equal(fs.existsSync(path.join(root, 'nova-dev.log')), false);
 });
+
+test('only the insights section loads automatically; drafts are never requested without a click', () => {
+  const client = fs.readFileSync(path.join(root, 'client.js'), 'utf8');
+  const calls = [...client.matchAll(/loadSection\(([^)]*)\)/g)].map((m) => m[1].trim()).filter((arg) => arg && arg !== 'section');
+  assert.deepEqual(calls, ["'insights'"], 'loadSection may only be called with a literal for insights; drafts go through the click handler');
+  assert.match(client, /generate-cover-letter/);
+  assert.match(client, /\/api\/narrative/);
+  const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
+  assert.ok(vercel.functions['api/narrative.js'], 'narrative function needs its own maxDuration');
+});

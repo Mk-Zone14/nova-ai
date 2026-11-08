@@ -194,10 +194,48 @@
     return `<article class="resource-card" tabindex="0"><div class="resource-card-top">${badge}${durationEl}</div><div class="resource-card-skill">${safe(skill)}</div><strong class="resource-card-title">${safe(title)}</strong>${providerEl}<div class="resource-card-footer">${linkEl}</div></article>`;
   }
 
-  function strategyMarkup(report) {
+  // ---- on-demand sections -------------------------------------------------------------------
+  // `state` describes the background requests for a report (it is UI state, never stored):
+  //   insights / coverLetter / interview : 'loading' | 'error' | undefined
+  //   canGenerate                         : false when the original inputs are no longer in memory
+
+  const INSIGHT_MODULES = new Set(['strengths', 'gaps', 'documents', 'risks', 'resources']);
+
+  function insightsStatusMarkup(status) {
+    if (status === 'error') {
+      return '<article class="detail-item narrative-status-item" role="alert"><p>Nova couldn\'t prepare this analysis.</p><button class="secondary-button" type="button" data-action="retry-insights">Try again</button></article>';
+    }
+    if (status === 'unavailable') {
+      return '<article class="detail-item narrative-status-item"><p class="empty">These details weren\'t saved with this analysis, and your original inputs aren\'t kept. Run a new analysis to generate them.</p></article>';
+    }
+    return '<article class="detail-item narrative-status-item" role="status"><p class="narrative-pending">Nova is still preparing this analysis. It fills in automatically in a few seconds.</p></article>';
+  }
+
+  // True when the report carries the on-demand "insights" section (or content from before the split).
+  function hasInsights(report) {
+    if (report?.narrativeSections?.insights === true) return true;
+    return ['strengths', 'weaknesses', 'missingSkills', 'riskAnalysis', 'requiredDocuments', 'learningResources', 'roadmap']
+      .some((key) => arr(report?.[key]).length > 0);
+  }
+
+  function draftSection({ title, readyHeaderExtra = '', readyHtml, hasContent, status, action, actionLabel, loadingText, errorText, hint, canGenerate }) {
+    const header = (extra) => `<div class="detail-item-header"><strong>${safe(title)}</strong>${extra}</div>`;
+    if (hasContent) return `<article class="detail-item">${header(readyHeaderExtra)}${readyHtml}</article>`;
+    if (status === 'loading') return `<article class="detail-item" role="status">${header('')}<p class="narrative-pending">${safe(loadingText)}</p></article>`;
+    if (status === 'error') return `<article class="detail-item" role="alert">${header('')}<p>${safe(errorText)}</p><button class="secondary-button" type="button" data-action="${action}">Try again</button></article>`;
+    if (canGenerate === false) return `<article class="detail-item">${header('')}<p class="empty">This needs your original inputs, which aren\'t kept for saved analyses. Run a new analysis to generate it.</p></article>`;
+    return `<article class="detail-item">${header('')}<p>${safe(hint)}</p><button class="secondary-button" type="button" data-action="${action}">${safe(actionLabel)}</button></article>`;
+  }
+
+  function interviewMarkup(questions) {
+    return `<div class="detail-list">${questions.map((item) => `<details class="detail-item"><summary class="detail-item-header"><strong>${safe(item.question || 'Question')}</strong></summary><p><b>Why it\'s asked:</b> ${safe(item.whyAsked || notAvailable())}</p><p><b>Suggested answer:</b> ${safe(item.suggestedAnswer || notAvailable())}</p></details>`).join('')}</div>`;
+  }
+
+  function strategyMarkup(report, state = {}) {
     const requirements = statusCounts(report);
     const documents = arr(report?.requiredDocuments);
     const pendingDocument = documents.find((item) => !/completed|ready|not[\s_-]*required/i.test(item?.status || ''));
+    const insightsPending = ['loading', 'error', 'unavailable'].includes(state.insights);
     const actions = [
       ['Should I apply?', humanizeVerdict(report?.finalVerdict || report?.eligibilityVerdict || 'Review the eligibility status before submitting.')],
       ['What to emphasize', firstText(report?.strengths, notAvailable())],
@@ -206,14 +244,40 @@
       ['Before submitting', pendingDocument?.document || nextBestAction(report)]
     ];
     const coverText = String(report?.coverLetter || '');
-    const coverHtml = coverText ? coverText.split(/\n+/).filter(Boolean).map((para) => `<p>${safe(para)}</p>`).join('') : '<span class="empty">No cover letter was generated.</span>';
+    const coverHtml = coverText.split(/\n+/).filter(Boolean).map((para) => `<p>${safe(para)}</p>`).join('');
     const resources = arr(report?.learningResources);
     const resourcesHtml = resources.length
       ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>`
       : '<span class="empty">No learning resources were generated.</span>';
-    return `<div class="strategy-grid"><div class="detail-summary">${requirements.total ? `${requirements.met} of ${requirements.total} mapped requirements are currently matched. Use the actions below to decide how to spend your effort.` : 'Use the evidence and gaps below to decide how to spend your effort.'}</div>${actions.map(([label, value]) => `<article class="strategy-card"><span>${safe(label)}</span><p>${safe(value)}</p></article>`).join('')}<article class="detail-item"><div class="detail-item-header"><strong>Generated cover letter</strong><button class="secondary-button" id="coverLetterCopy" type="button">Copy</button></div><div class="cover-letter-content">${coverHtml}</div></article><article class="detail-item"><div class="detail-item-header"><strong>Learning resources</strong><span class="status-unknown">${resources.length} available</span></div>${resourcesHtml}</article></div>`;
+    const questions = arr(report?.interviewQuestions).filter((item) => item && typeof item === 'object');
+
+    const cover = draftSection({
+      title: coverText ? 'Generated cover letter' : 'Cover letter',
+      readyHeaderExtra: '<button class="secondary-button" id="coverLetterCopy" type="button">Copy</button>',
+      readyHtml: `<div class="cover-letter-content">${coverHtml}</div>`,
+      hasContent: Boolean(coverHtml), status: state.coverLetter, action: 'generate-cover-letter', actionLabel: 'Draft cover letter',
+      loadingText: 'Drafting your cover letter… this takes a few seconds.', errorText: 'Couldn\'t draft the cover letter.',
+      hint: 'Written on request from your profile and this opportunity, using only facts you provided. Review and edit before sending.',
+      canGenerate: state.canGenerate
+    });
+    const interview = draftSection({
+      title: 'Interview preparation', readyHtml: interviewMarkup(questions), hasContent: questions.length > 0,
+      status: state.interview, action: 'generate-interview', actionLabel: 'Prepare interview questions',
+      loadingText: 'Preparing interview questions… this takes a few seconds.', errorText: 'Couldn\'t prepare the interview questions.',
+      hint: 'Five likely questions with suggested answers, including ones that probe your gaps. Generated on request.',
+      canGenerate: state.canGenerate
+    });
+    const summary = requirements.total
+      ? `${requirements.met} of ${requirements.total} mapped requirements are currently matched. Use the actions below to decide how to spend your effort.`
+      : 'Use the evidence and gaps below to decide how to spend your effort.';
+    const insightCards = insightsPending
+      ? insightsStatusMarkup(state.insights)
+      : actions.map(([label, value]) => `<article class="strategy-card"><span>${safe(label)}</span><p>${safe(value)}</p></article>`).join('');
+    const resourcesArticle = insightsPending ? '' : `<article class="detail-item"><div class="detail-item-header"><strong>Learning resources</strong><span class="status-unknown">${resources.length} available</span></div>${resourcesHtml}</article>`;
+    return `<div class="strategy-grid"><div class="detail-summary">${safe(summary)}</div>${insightCards}${cover}${interview}${resourcesArticle}</div>`;
   }
-  function moduleContent(module, report) {
+
+  function baseModuleContent(module, report, state) {
     const counts = statusCounts(report);
     if (module === 'requirements') {
       return { title: 'Requirements', subtitle: `${counts.met} of ${counts.total || 0} mapped requirements matched`, html: `<div class="detail-summary">Each item connects the opportunity requirement to the evidence Nova found in the supplied profile.</div><div class="detail-list">${counts.items.length ? counts.items.map(detailRequirement).join('') : '<span class="empty">No requirements were identified.</span>'}</div>` };
@@ -236,7 +300,7 @@
       return { title: 'Blockers', subtitle: `${risks.length} risk signal${risks.length === 1 ? '' : 's'}`, html: `<div class="detail-summary">Risk signals help you decide whether to apply now, verify something, or strengthen evidence first.</div><div class="detail-list">${risks.length ? risks.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.risk || 'Risk signal')}</strong><span class="status-${String(item.severity || 'medium').toLowerCase() === 'high' ? 'missing' : 'partial'}">${safe(presentationText(item.severity || 'Medium'))}</span></div><p>${safe(item.mitigation || 'Review this risk before submitting.')}</p></article>`).join('') : '<span class="empty">No significant risks were identified.</span>'}</div>` };
     }
     if (module === 'strategy') {
-      return { title: 'Application strategy', subtitle: 'A concise path forward', html: strategyMarkup(report) };
+      return { title: 'Application strategy', subtitle: 'A concise path forward', html: strategyMarkup(report, state) };
     }
     if (module === 'resources') {
       const resources = arr(report?.learningResources);
@@ -244,6 +308,36 @@
     }
     return { title: 'Evidence', subtitle: 'Focused details from your fit brief', html: '<span class="empty">No details are available for this module.</span>' };
   }
+  function moduleContent(module, report, state = {}) {
+    const content = baseModuleContent(module, report, state);
+    const status = state.insights;
+    if (INSIGHT_MODULES.has(module) && ['loading', 'error', 'unavailable'].includes(status)) {
+      const subtitle = { error: 'Could not be prepared', unavailable: 'Not saved with this analysis' }[status] || 'Still preparing…';
+      return { ...content, subtitle, html: insightsStatusMarkup(status) };
+    }
+    return content;
+  }
+
+  // The verified verdict and requirement statuses, sent back to /api/narrative so generated
+  // writing stays consistent with them. Untrusted on the server, which re-validates it.
+  const CANONICAL_STATUS = { met: 'Matched', partial: 'Partial Match', missing: 'Missing', unknown: 'Unknown' };
+  function buildAssessmentPayload(report) {
+    const rows = requirementItems(report).slice(0, 25).map((item) => ({
+      requirement: String(item.requirement).replace(/\s+/g, ' ').trim().slice(0, 300),
+      status: CANONICAL_STATUS[normalizeStatus(item.status).key],
+      hardEligibility: item.hardEligibility === true,
+      mandatory: item.mandatory === true || item.hardEligibility === true
+    }));
+    return { verdict: report?.eligibilityVerdict, rows };
+  }
+
+  // Fold a generated section into the report, re-applying the same coercions as the first load.
+  function mergeNarrative(report, data, section) {
+    const generated = data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+    const narrativeSections = { ...(report?.narrativeSections || {}), ...(section ? { [section]: true } : {}) };
+    return adaptNovaReport({ ...report, ...generated, narrativeSections });
+  }
+
   function buildReportText(report = {}) {
     const countsData = statusCounts(report);
     return [
@@ -277,7 +371,8 @@
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
     statusCounts, firstText, biggestConcern, nextBestAction, contextCandidate,
-    detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText
+    detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
+    buildAssessmentPayload, mergeNarrative, hasInsights
   };
   root.NovaReport = api;
   if (typeof module === 'object' && module.exports) module.exports = api;

@@ -1,7 +1,8 @@
 {
   "framework": null,
   "functions": {
-    "api/analyze.js": { "maxDuration": 60 }
+    "api/analyze.js": { "maxDuration": 60 },
+    "api/narrative.js": { "maxDuration": 60 }
   },
   "headers": [
     {
