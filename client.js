@@ -532,6 +532,7 @@ const STATUS_LABELS = {
   NEEDS_VERIFICATION: 'Needs verification',
   ELIGIBLE: 'Eligible',
   INELIGIBLE: 'Not eligible',
+  NOT_ELIGIBLE: 'Not eligible',
   READY: 'Ready to apply',
   READY_TO_APPLY: 'Ready to apply',
   READY_AFTER_ONE_FIX: 'Ready after one fix'

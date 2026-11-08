@@ -183,8 +183,8 @@ npm run test
 Current test status:
 
 ```text
-29 tests
-29 passed
+46 tests
+46 passed
 0 failed
 ```
 
@@ -258,35 +258,19 @@ nova-ai/
 
 ## 🔄 Analysis Pipeline
 
-Nova AI follows a structured pipeline rather than simply displaying a raw LLM response.
+The verdict and score are computed **in code**, not by the model. The LLM only proposes requirements and statuses; the server verifies them.
 
-### 1. Candidate Input
+1. **Extract** — the model lists the opportunity's requirements, each flagged `mandatory` and `hardEligibility`, with a verbatim `sourceQuote`. Requirements whose quote isn't found in the opportunity text are dropped.
+2. **Match** — the model assesses each requirement against the profile and must quote the supporting profile text. The server checks the quote is verbatim; otherwise `Matched`/`Partial Match` is downgraded to `Unknown`. A *hard* requirement can only be `Missing` with a verified contradicting quote — absence from a resume is not proof of ineligibility.
+3. **Compute** (`lib/eligibility.js`, pure and unit-tested):
+   * Any hard requirement `Missing` → **Not eligible**
+   * Otherwise any hard requirement `Unknown`/`Partial Match` → **Needs verification**
+   * Otherwise → **Eligible**
+   * Fit score = weighted share of earned credit (hard ×3, mandatory ×2, preferred ×1; Matched = 1, Partial = 0.5, Missing/Unknown = 0)
+   * **Evidence coverage** = % of requirements backed by a verified quote
+4. **Narrative** — cover letter, roadmap, interview questions, resources and resume feedback are generated last, told the computed statuses are final, and cannot set the verdict or any score. If this step fails, the verified verdict is still returned.
 
-The user provides their profile or resume.
-
-### 2. Opportunity Input
-
-The user provides the opportunity description and requirements.
-
-### 3. Requirement Extraction
-
-The backend identifies relevant requirements and constraints.
-
-### 4. Candidate Matching
-
-The candidate profile is compared against the opportunity requirements.
-
-### 5. Evidence-Based Reasoning
-
-The system evaluates the available evidence rather than relying solely on generic similarity.
-
-### 6. Structured Output
-
-The model produces a structured analysis containing eligibility, scores, gaps, risks, recommendations, and supporting information.
-
-### 7. Interactive Results
-
-The frontend turns the structured response into an interactive dashboard.
+Known limits: the ATS and resume-strength scores are still model-estimated, and "Eligible" with zero hard requirements flagged means nothing disqualifying was *checked*, not that nothing exists. Always confirm against the official criteria.
 
 ---
 
