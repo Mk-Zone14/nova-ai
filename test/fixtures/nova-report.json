@@ -1,0 +1,51 @@
+{
+  "overallMatchScore": 62,
+  "eligibilityVerdict": "Needs verification",
+  "verdictReason": "Eligibility can't be confirmed: 1 hard requirement lacks verified evidence in your profile: Aged 18-25.",
+  "whyVerdict": "Why <b>bold</b> & \"quoted\"",
+  "finalVerdict": "Review the eligibility status before submitting.",
+  "executiveRecommendation": "Verify age <img src=x onerror=alert(1)> first.",
+  "confidenceScore": 67,
+  "evidenceCoverage": 67,
+  "applicationReadiness": null,
+  "readinessCategory": "Needs verification",
+  "narrativeAvailable": true,
+  "opportunityName": "Atlas <script>alert(1)</script> Fellowship",
+  "opportunitySummary": { "role": "Product Engineering Intern", "organization": "Atlas Labs", "deadline": "30 Sep 2026" },
+  "profileSummary": { "name": "Priya Sharma", "degree": "B.Tech CSE", "university": "DTU" },
+  "requirementMapping": [
+    { "requirement": "Aged 18-25", "status": "Unknown", "evidence": "", "note": "Not stated.", "reasoning": "Profile does not mention age.", "confidence": "Not verified", "mandatory": true, "hardEligibility": true, "evidenceVerified": false },
+    { "requirement": "Python <i>or</i> JS", "status": "Matched", "evidence": "Skills: Python, JavaScript", "note": "ok", "reasoning": "Lists both.", "confidence": "Verified", "mandatory": true, "hardEligibility": false, "evidenceVerified": true },
+    { "requirement": "Docker", "status": "partial_match", "evidence": "Docker Compose", "reasoning": "Partial.", "confidence": "Verified", "mandatory": false, "hardEligibility": false },
+    { "requirement": "React", "status": "Missing", "mandatory": false },
+    { "requirement": "Weird", "status": "???", "evidence": "\"><svg onload=alert(2)>" }
+  ],
+  "mandatoryRequirements": [{ "requirement": "Aged 18-25", "status": "Unknown", "note": "dup of mapping" }],
+  "preferredRequirements": [{ "requirement": "Cloud deployment", "status": "Missing", "note": "Not shown." }],
+  "missingRequirements": ["Aged 18-25"],
+  "missingSkills": [
+    { "skill": "Kubernetes", "whyItMatters": "Used for <deploys>", "priority": "High", "difficulty": "Medium", "learningTime": "4 weeks" },
+    { "skill": "Testing", "priority": "low" }
+  ],
+  "strengths": ["Strong Python", "Shipped to 10,000 users", ""],
+  "weaknesses": ["No cloud experience"],
+  "requiredDocuments": [{ "document": "Transcript", "status": "Completed" }, { "document": "Cover letter", "status": "Missing" }, { "document": "Passport", "status": "not_required" }],
+  "roadmap": [{ "week": "1", "focus": "Docs", "action": "Read the docs" }],
+  "personalizedRecommendations": ["Add a deployed demo"],
+  "riskAnalysis": [{ "risk": "Competitive <b>pool</b>", "severity": "High", "mitigation": "Apply early" }, { "risk": "Timing", "severity": "Low" }],
+  "atsReadiness": { "score": 71, "issues": ["Tables"], "suggestions": ["Use plain text"] },
+  "resumeStrength": { "score": 48, "highlights": ["Clear"], "weaknesses": ["Thin"] },
+  "coverLetter": "Dear Atlas,\n\nI am <b>excited</b>.\n\nThanks.",
+  "interviewQuestions": [{ "question": "Why Atlas?", "whyAsked": "Fit", "suggestedAnswer": "Because" }],
+  "learningResources": [
+    { "skill": "Python", "resource": "Python Tutorial", "provider": "Coursera", "url": "https://www.coursera.org/learn/some-invented-path", "type": "Free course", "timeToComplete": "4h" },
+    { "skill": "Git", "resource": "Hostile", "provider": "Nobody", "url": "javascript:alert(1)", "type": "Tutorial", "timeToComplete": "1h" },
+    { "skill": "Go", "resource": "Fuzzy", "provider": "Go", "url": "https://github.com/attacker/repo", "type": "Docs", "timeToComplete": "2h" },
+    "not-an-object"
+  ],
+  "resumeImprovements": [{ "section": "Experience", "current": "Did things", "suggested": "Shipped X", "impact": "High" }],
+  "_evidenceTrace": {
+    "requirements": [{ "id": "R1", "requirement": "Aged 18-25", "mandatory": true, "hardEligibility": true }],
+    "matches": [{ "requirement_id": "R1", "reasoning": "trace reasoning", "confidence": "High", "evidence_id": "E1" }]
+  }
+}

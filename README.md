@@ -185,8 +185,8 @@ npm run test
 Current test status:
 
 ```text
-61 tests
-61 passed
+88 tests
+88 passed
 0 failed
 ```
 
@@ -252,6 +252,7 @@ nova-ai/
 ├── print.css
 ├── theme-init.js
 ├── resource-links.js
+├── report-model.js      # pure report logic + markup builders (unit-tested)
 │
 ├── local-dev.js
 ├── package.json

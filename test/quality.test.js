@@ -34,11 +34,16 @@ test('document retains critical accessibility landmarks and labels', () => {
   assert.match(html, /aria-pressed="false"/);
 });
 
-test('client continues to escape dynamic report content before HTML insertion', () => {
+test('client has no new raw HTML sinks and loads the tested model before itself', () => {
   const client = read('client.js');
-  assert.match(client, /replace\(\/\[&<>"'\]\//);
-  assert.match(client, /safe\(x\.requirement\)/);
-  assert.match(client, /safe\(para\)/);
+  // Escaping itself is tested behaviourally in report-model.test.js. Here we only guard the DOM
+  // boundary: the two known innerHTML writes (setHTML helper, history list) must not multiply.
+  assert.equal((client.match(/\.innerHTML\s*=/g) || []).length, 2, 'new innerHTML assignment: route it through report-model.js and add a test');
+  assert.doesNotMatch(client, /insertAdjacentHTML|document\.write|outerHTML\s*=/);
+  assert.match(client, /safe\(entry\.title\)/, 'history titles must stay escaped');
+  const html = read('index.html');
+  assert.ok(html.indexOf('src="resource-links.js"') < html.indexOf('src="report-model.js"'));
+  assert.ok(html.indexOf('src="report-model.js"') < html.indexOf('src="client.js"'));
 });
 
 test('browser input guards preserve intended file and text limits', () => {
