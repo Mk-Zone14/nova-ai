@@ -75,17 +75,21 @@ test('insights: one model call, only analysis keys survive, and the model cannot
   assert.equal(res.body.section, 'insights');
 });
 
-test('prompts carry the verified statuses as final facts and treat user text as untrusted', async () => {
+test('prompts carry the verified statuses and the texts as JSON data, and the system message holds none of it', async () => {
   const calls = [];
   global.fetch = model({ strengths: ['x'] }, calls);
   await run();
-  const system = calls[0].messages[0].content;
+  const [system, user] = calls[0].messages.map((message) => message.content);
   assert.match(system, /^STAGE: INSIGHTS/);
-  assert.match(system, /Verdict: Needs verification/);
-  assert.match(system, /"requirement":"React","status":"Missing"/);
   assert.match(system, /Never claim the candidate meets a requirement whose status is Missing, Unknown or Partial Match/);
   assert.match(system, /untrusted reference data/);
-  assert.match(system, new RegExp(PROFILE.slice(0, 30)));
+  assert.doesNotMatch(system, new RegExp(PROFILE.slice(0, 30)), 'user text must never be interpolated into the system message');
+  assert.doesNotMatch(system, /Needs verification|"status":"Missing"/, 'neither may the assessment');
+  const data = JSON.parse(user);
+  assert.deepEqual(Object.keys(data).sort(), ['opportunity', 'student_profile', 'verified_assessment']);
+  assert.equal(data.verified_assessment.verdict, 'Needs verification');
+  assert.equal(data.verified_assessment.requirements.find((row) => row.requirement === 'React').status, 'Missing');
+  assert.equal(data.student_profile, PROFILE);
 });
 
 test('coverLetter: returns only the letter, capped in length, from its own prompt', async () => {

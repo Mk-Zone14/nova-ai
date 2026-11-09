@@ -18,9 +18,9 @@ async function runPipeline(profile, opportunity) {
     const deadline = Date.now() + TOTAL_BUDGET_MS;
 
     // Stage 1: extract requirements. Each must carry a quote verifiable in the opportunity text.
+    // Prompt builders return { system, user }: fixed instructions in system, all untrusted text as JSON in user.
     const extractRaw = parseModelJson(await callModel({
-        system: createExtractPrompt(opportunity),
-        user: 'Extract the requirements and output JSON.',
+        ...createExtractPrompt(opportunity),
         deadline, maxMs: EXTRACT_MAX_MS
     }));
     const { requirements, dropped } = normalizeRequirements(extractRaw, opportunity);
@@ -28,8 +28,7 @@ async function runPipeline(profile, opportunity) {
 
     // Stage 2: match against the profile. Evidence is verified in code, not trusted.
     const matchRaw = parseModelJson(await callModel({
-        system: createMatchPrompt(requirements, profile),
-        user: 'Assess each requirement against the profile and output JSON.',
+        ...createMatchPrompt(requirements, profile),
         deadline, maxMs: MATCH_MAX_MS
     }));
     const matches = normalizeMatches(matchRaw, requirements, profile);

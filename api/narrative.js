@@ -31,8 +31,7 @@ async function handler(req, res) {
 
         const config = SECTIONS[section];
         const raw = parseModelJson(await callModel({
-            system: config.prompt(texts.profile, texts.opportunity, assessment),
-            user: config.user,
+            ...config.prompt(texts.profile, texts.opportunity, assessment),
             deadline: Date.now() + BUDGET_MS,
             maxMs: CALL_MAX_MS
         }));
