@@ -148,6 +148,29 @@ test('only the insights section loads automatically; drafts are never requested 
   assert.ok(vercel.functions['api/narrative.js'], 'narrative function needs its own maxDuration');
 });
 
+test('PDF export: private clone, colour sanitising, state guard and honest error handling stay wired', () => {
+  const client = read('client.js');
+  const css = read('styles.css');
+  const start = client.indexOf('async function exportPdf');
+  const body = client.slice(start, client.indexOf("$('#pdfBtn')?.addEventListener", start));
+  assert.ok(start > -1 && body.length > 200, 'exportPdf not found');
+  assert.match(body, /exportBlocked\(\)/, 'export must be rejected while details are loading');
+  assert.match(body, /onclone:\s*prepareCloneForPdf/, 'html2canvas must sanitise colours it cannot parse');
+  assert.match(body, /cloneNode\(true\)/, 'the live report must not be modified for export');
+  assert.match(body, /pdf-export/);
+  assert.match(body, /pdfExporting/, 'concurrent exports must be ignored');
+  const catchBlock = body.slice(body.indexOf('catch (error)'), body.indexOf('finally'));
+  assert.match(catchBlock, /console\.error/, 'failures must be logged');
+  assert.doesNotMatch(catchBlock, /window\.print/, 'a real failure must not silently fall back to print');
+  const prep = client.slice(client.indexOf('function prepareCloneForPdf'), client.indexOf('const PDF_AVOID_BREAKS'));
+  assert.match(prep, /setProperty\([^)]*'important'\)/, 'sanitised colours must beat !important stylesheet rules');
+  assert.match(client, /The PDF library is unavailable/, 'the intentional print fallback must say so');
+  for (const id of ['copyBtn', 'jsonBtn', 'pdfBtn', 'printBtn']) assert.ok(client.includes(`'${id}'`), `${id} must be guarded`);
+  assert.match(css, /\[data-theme="light"\],\s*\.pdf-export\s*\{/, 'PDF clone must reuse the light palette');
+  assert.match(css, /\.pdf-export \.report-actions[^{]*\{[^}]*display:\s*none/, 'toolbar must be hidden in the PDF');
+  assert.match(css, /\.pdf-export \.decision-hero[^{]*\{[^}]*break-inside:\s*avoid/s, 'cards must not split across pages');
+});
+
 test('client error handling: one request helper, bounded timeouts, no duplicate runs, no swallowed errors', () => {
   const client = read('client.js');
   assert.equal([...client.matchAll(/\bfetch\(/g)].length, 1, 'all network calls must go through postJson');

@@ -381,13 +381,50 @@
     ].join('\n');
   }
 
+  // ---- export ---------------------------------------------------------------------------------
+  // html2canvas (inside html2pdf) cannot parse CSS Color 4 functions. Chrome reports computed color-mix()
+  // values as color(srgb ...), so the export converts them in its private clone of the report.
+  const MODERN_COLOR = /(?:^|[^\w-])(?:color|color-mix|lab|lch|oklab|oklch|hwb|light-dark)\(/i;
+  function hasModernColor(value) {
+    return typeof value === 'string' && MODERN_COLOR.test(value);
+  }
+  // Exact conversion for the one form Chrome emits for srgb color-mix results; null for anything else
+  // (the caller then falls back to letting a canvas resolve the colour).
+  function modernColorToRgba(value) {
+    const match = /^color\(\s*srgb\s+(-?[\d.]+%?)\s+(-?[\d.]+%?)\s+(-?[\d.]+%?)(?:\s*\/\s*(-?[\d.]+%?))?\s*\)$/i.exec(String(value || '').trim());
+    if (!match) return null;
+    const unit = (token) => (token.endsWith('%') ? parseFloat(token) / 100 : parseFloat(token));
+    const channel = (token) => Math.round(Math.min(1, Math.max(0, unit(token))) * 255);
+    const alpha = match[4] === undefined ? 1 : Math.min(1, Math.max(0, unit(match[4])));
+    const parts = [channel(match[1]), channel(match[2]), channel(match[3])];
+    if (parts.some(Number.isNaN) || Number.isNaN(alpha)) return null;
+    return `rgba(${parts.join(', ')}, ${Math.round(alpha * 1000) / 1000})`;
+  }
+  // Exporting while the background analysis is incomplete would produce placeholder text, so reject it.
+  // 'unavailable' (restored from history, details not saved) is allowed: the report says so itself.
+  function exportBlockReason(state = {}) {
+    if (state.insights === 'loading') return 'Nova is still preparing the analysis details. You can export once they finish loading.';
+    if (state.insights === 'error') return 'The analysis details could not be prepared. Retry them (open Strengths or Gaps) before exporting.';
+    return null;
+  }
+  function pdfTitle(report) {
+    const role = report?.opportunitySummary?.role || report?.opportunityName || 'Eligibility assessment';
+    return `Nova fit brief — ${String(role).replace(/\s+/g, ' ').trim().slice(0, 120)}`;
+  }
+  function pdfFilename(report, now = new Date()) {
+    const role = report?.opportunitySummary?.role || report?.opportunityName || '';
+    const slug = String(role).normalize('NFKD').replace(/[^\x00-\x7f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
+    const date = now instanceof Date && !Number.isNaN(now.getTime()) ? now.toISOString().slice(0, 10) : 'report';
+    return `nova-fit-brief-${slug ? `${slug}-` : ''}${date}.pdf`;
+  }
+
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
     statusCounts, firstText, biggestConcern, nextBestAction, contextCandidate,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
-    responseErrorMessage
+    hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage
   };
   root.NovaReport = api;
   if (typeof module === 'object' && module.exports) module.exports = api;

@@ -9,7 +9,7 @@ const {
   humanizeVerdict, requirementItems, statusCounts, biggestConcern, nextBestAction, contextCandidate,
   detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
   buildAssessmentPayload, mergeNarrative, hasInsights,
-  responseErrorMessage
+  hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage
 } = model;
 
 const MODULES = ['requirements', 'strengths', 'gaps', 'documents', 'risks', 'strategy', 'resources'];
@@ -402,6 +402,56 @@ test('hasInsights recognises generated sections, legacy reports, and a verdict-o
   assert.equal(hasInsights(mergeNarrative(verdictOnly, {}, 'insights')), true, 'an insights section that legitimately found nothing is still generated');
   assert.equal(hasInsights(mergeNarrative(verdictOnly, { coverLetter: 'x' }, 'coverLetter')), false);
 });
+
+// ---- PDF export helpers ----------------------------------------------------------------------
+
+test('hasModernColor flags the colour functions html2canvas cannot parse, and nothing else', () => {
+  for (const bad of ['color(srgb 0.0666667 0.0862745 0.113725 / 0.94)', 'color-mix(in srgb, red 50%, blue)', 'lab(50% 40 59)', 'oklch(60% 0.2 30)', 'oklab(0.5 0.1 0.1)', 'lch(50% 30 40)', 'hwb(30 10% 10%)', 'light-dark(#fff, #000)', 'linear-gradient(red, color(srgb 1 0 0))', 'COLOR(srgb 1 0 0)']) {
+    assert.equal(hasModernColor(bad), true, bad);
+  }
+  for (const ok of ['rgb(1, 2, 3)', 'rgba(1, 2, 3, 0.5)', '#fff', 'transparent', 'none', 'hsl(10 20% 30%)', 'background-color', '', null, undefined, 42]) {
+    assert.equal(hasModernColor(ok), false, String(ok));
+  }
+});
+
+test('modernColorToRgba converts the srgb form Chrome emits exactly, and refuses everything it cannot convert', () => {
+  assert.equal(modernColorToRgba('color(srgb 0.0666667 0.0862745 0.113725 / 0.94)'), 'rgba(17, 22, 29, 0.94)');
+  assert.equal(modernColorToRgba('color(srgb 1 0 0)'), 'rgba(255, 0, 0, 1)', 'alpha defaults to 1');
+  assert.equal(modernColorToRgba('color(srgb 100% 50% 0% / 50%)'), 'rgba(255, 128, 0, 0.5)', 'percentages');
+  assert.equal(modernColorToRgba('  color(srgb 2 -1 0.5 / 3)  '), 'rgba(255, 0, 128, 1)', 'clamped');
+  for (const unsupported of ['color(display-p3 1 0 0)', 'color(srgb 1 0)', 'color(srgb a b c)', 'lab(50% 40 59)', 'rgb(1,2,3)', '', null, undefined]) {
+    assert.equal(modernColorToRgba(unsupported), null, String(unsupported));
+  }
+});
+
+test('exportBlockReason rejects export only while details are loading or failed', () => {
+  assert.match(exportBlockReason({ insights: 'loading' }), /still preparing/i);
+  assert.match(exportBlockReason({ insights: 'error' }), /could not be prepared/i);
+  assert.equal(exportBlockReason({ insights: 'unavailable' }), null, 'restored reports can export what they have');
+  assert.equal(exportBlockReason({}), null);
+  assert.equal(exportBlockReason(), null);
+  assert.equal(exportBlockReason({ coverLetter: 'loading', interview: 'loading' }), null, 'drafts are optional and never block export');
+});
+
+test('pdfTitle and pdfFilename are derived safely from the report', () => {
+  const report = { opportunitySummary: { role: 'Product Engineering Intern' } };
+  assert.equal(pdfTitle(report), 'Nova fit brief — Product Engineering Intern');
+  assert.equal(pdfTitle({}), 'Nova fit brief — Eligibility assessment');
+  assert.equal(pdfTitle({ opportunityName: '  Spaced \n out  ' }), 'Nova fit brief — Spaced out');
+  assert.ok(pdfTitle({ opportunityName: 'x'.repeat(500) }).length < 150);
+  const day = new Date('2026-11-08T10:00:00Z');
+  assert.equal(pdfFilename(report, day), 'nova-fit-brief-product-engineering-intern-2026-11-08.pdf');
+  assert.equal(pdfFilename({}, day), 'nova-fit-brief-2026-11-08.pdf', 'no role: no dangling hyphen');
+  assert.equal(pdfFilename({ opportunityName: 'Ünïcode Fellowship / 2026 *?' }, day), 'nova-fit-brief-unicode-fellowship-2026-2026-11-08.pdf', 'accents are stripped, not dropped with their letter');
+  assert.equal(pdfFilename({ opportunityName: '日本語' }, day), 'nova-fit-brief-2026-11-08.pdf', 'non-latin only falls back cleanly');
+  assert.match(pdfFilename({ opportunityName: 'a'.repeat(200) }, day), /^nova-fit-brief-a{40}-2026-11-08\.pdf$/);
+  assert.match(pdfFilename(report, new Date('nope')), /-report\.pdf$/, 'invalid date does not throw');
+  for (const hostile of ['../../etc/passwd', 'a"b\\c<d>', 'x\u0000y']) {
+    assert.match(pdfFilename({ opportunityName: hostile }, day), /^nova-fit-brief-[a-z0-9-]*2026-11-08\.pdf$/, hostile);
+  }
+});
+
+// ---- error messages ----------------------------------------------------------------------------
 
 test('responseErrorMessage prefers our own safe message and otherwise describes the status', () => {
   assert.equal(responseErrorMessage(429, '{"error":"Too many analysis requests. Please wait a minute and try again."}'), 'Too many analysis requests. Please wait a minute and try again.');

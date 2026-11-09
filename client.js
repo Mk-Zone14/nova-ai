@@ -11,7 +11,7 @@ const {
   safe, arr, notAvailable, numberOrNull, adaptNovaReport, friendlyError, list, presentationText,
   humanizeVerdict, statusCounts, biggestConcern, nextBestAction, contextCandidate, moduleContent,
   buildAssessmentPayload, mergeNarrative, hasInsights,
-  responseErrorMessage
+  hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage
 } = window.NovaReport;
 const storage = {
   get(key) {
@@ -675,6 +675,24 @@ function renderInsightPanels() {
   setHTML('#resumeStrWeaknesses', pending ? '' : list(report.resumeStrength?.weaknesses, 'No improvement areas identified.'));
   setHTML('#atsIssues', pending ? '' : list(report.atsReadiness?.issues, 'No ATS issues identified.'));
   setHTML('#atsSuggestions', pending ? '' : list(report.atsReadiness?.suggestions, 'No ATS suggestions identified.'));
+  updateExportButtons();
+}
+const EXPORT_BUTTONS = ['copyBtn', 'jsonBtn', 'pdfBtn', 'printBtn'];
+// Exports stay focusable (aria-disabled, not disabled) so keyboard users hear why they are unavailable.
+function updateExportButtons() {
+  const reason = exportBlockReason(uiState());
+  EXPORT_BUTTONS.forEach((id) => {
+    const button = $(`#${id}`);
+    if (!button) return;
+    if (reason) { button.setAttribute('aria-disabled', 'true'); button.title = reason; }
+    else { button.removeAttribute('aria-disabled'); button.removeAttribute('title'); }
+  });
+}
+// True (after telling the user why) when an export must not run yet.
+function exportBlocked() {
+  const reason = exportBlockReason(uiState());
+  if (reason) toast(reason, 5000);
+  return Boolean(reason);
 }
 function refreshNarrativeUI() {
   renderInsightPanels();
@@ -751,16 +769,98 @@ function download(content, type, name) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 }
-$('#copyBtn')?.addEventListener('click', () => copyText(reportText(), 'Fit brief copied.', 'Could not copy the brief.'));
-$('#jsonBtn')?.addEventListener('click', () => { if (!latestReport) return toast('No report to export.'); download(JSON.stringify(latestReport, null, 2), 'application/json', 'nova-fit-brief.json'); toast('JSON downloaded.'); });
-$('#pdfBtn')?.addEventListener('click', async () => {
+$('#copyBtn')?.addEventListener('click', () => exportBlocked() || copyText(reportText(), 'Fit brief copied.', 'Could not copy the brief.'));
+$('#jsonBtn')?.addEventListener('click', () => { if (!latestReport) return toast('No report to export.'); if (exportBlocked()) return; download(JSON.stringify(latestReport, null, 2), 'application/json', 'nova-fit-brief.json'); toast('JSON downloaded.'); });
+// html2canvas throws on colour functions it cannot parse (color(), lab(), ...). Resolve them to rgba()
+// in the private clone it renders; gradients and shadows that use them are dropped there.
+function resolveModernColor(value) {
+  const exact = modernColorToRgba(value);
+  if (exact) return exact;
+  const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  context.canvas.width = context.canvas.height = 1;
+  context.fillStyle = value;
+  context.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = context.getImageData(0, 0, 1, 1).data;
+  return `rgba(${r}, ${g}, ${b}, ${Math.round((a / 255) * 1000) / 1000})`;
+}
+const PDF_COLOR_PROPERTIES = ['color', 'background-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'outline-color', 'text-decoration-color'];
+const PDF_DROP_PROPERTIES = ['background-image', 'box-shadow', 'border-image-source'];
+// Stylesheet injected into html2canvas's private clone document only (never the live page). With transitions running,
+// the inline colour overrides below start a transition, and for a frame computed colours are interpolated in oklab(),
+// which html2canvas cannot parse. Animations are also stopped so the snapshot is deterministic.
+const PDF_STABLE_STYLES = '.pdf-export, .pdf-export *, .pdf-export *::before, .pdf-export *::after { transition: none !important; animation: none !important; }';
+function prepareCloneForPdf(clonedDocument) {
+  const view = clonedDocument.defaultView;
+  const stable = clonedDocument.createElement('style');
+  stable.textContent = PDF_STABLE_STYLES;
+  clonedDocument.head.appendChild(stable);
+  // 'important' so the replacement also beats any !important rule in the stylesheet.
+  clonedDocument.querySelectorAll('*').forEach((element) => {
+    const style = view.getComputedStyle(element);
+    PDF_COLOR_PROPERTIES.forEach((property) => {
+      const value = style.getPropertyValue(property);
+      if (hasModernColor(value)) element.style.setProperty(property, resolveModernColor(value), 'important');
+    });
+    PDF_DROP_PROPERTIES.forEach((property) => {
+      if (hasModernColor(style.getPropertyValue(property))) element.style.setProperty(property, 'none', 'important');
+    });
+  });
+}
+const PDF_AVOID_BREAKS = ['.decision-hero', '.report-context', '.analysis-module', '.supplemental-card', '.module-heading'];
+let pdfExporting = false;
+const PDF_EXPORT_MARK = 'data-nova-pdf-export';
+// html2pdf 0.10.1 and html2canvas 1.4.1 only remove their overlay and iframe when rendering succeeds, so a failed
+// export leaves a fixed, pointer-capturing overlay over the page. Remove exactly what this export created:
+// the overlay holding our uniquely marked clone, and html2canvas iframes that did not exist before we started.
+function removeExportArtifacts(mark, iframesBefore) {
+  document.querySelectorAll(`.html2pdf__overlay [${PDF_EXPORT_MARK}="${mark}"]`).forEach((node) => node.closest('.html2pdf__overlay')?.remove());
+  document.querySelectorAll('iframe.html2canvas-container').forEach((frame) => { if (!iframesBefore.has(frame)) frame.remove(); });
+}
+async function exportPdf() {
   const report = $('#report');
-  if (!report || report.classList.contains('hidden')) return toast('No report to export.');
-  if (!window.html2pdf) return window.print();
-  toast('Generating PDF…');
-  try { await window.html2pdf().set({ margin: 8, filename: `nova-fit-brief-${Date.now()}.pdf`, image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }).from(report).save(); toast('PDF downloaded.'); } catch { toast('PDF generation failed. Using print instead.'); window.print(); }
-});
-$('#printBtn')?.addEventListener('click', () => window.print());
+  if (!report || report.classList.contains('hidden') || !latestReport) return toast('No report to export.');
+  if (exportBlocked() || pdfExporting) return;
+  if (!window.html2pdf) {
+    // Intentional fallback (not a failure): the PDF library did not load, so use the browser's own PDF printing.
+    toast('The PDF library is unavailable, so the print dialog is opening. Choose “Save as PDF”.', 5000);
+    return window.print();
+  }
+  pdfExporting = true;
+  const button = $('#pdfBtn');
+  button?.setAttribute('aria-busy', 'true');
+  toast('Generating PDF…', 15000);
+  const mark = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const iframesBefore = new Set(document.querySelectorAll('iframe.html2canvas-container'));
+  try {
+    // Render a private clone so the on-screen report is untouched; `.pdf-export` (styles.css) hides controls and sets print-safe colours.
+    const clone = report.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.setAttribute(PDF_EXPORT_MARK, mark);
+    clone.classList.add('pdf-export');
+    clone.querySelectorAll('details').forEach((details) => { details.open = true; });
+    await window.html2pdf().set({
+      margin: [10, 8, 12, 8],
+      filename: pdfFilename(latestReport),
+      image: { type: 'jpeg', quality: 0.95 },
+      html2canvas: { scale: 2, useCORS: true, onclone: prepareCloneForPdf },
+      pagebreak: { mode: ['css', 'legacy'], avoid: PDF_AVOID_BREAKS },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(clone).toPdf().get('pdf').then((pdf) => {
+      pdf.setProperties({ title: pdfTitle(latestReport), subject: 'Opportunity fit brief', creator: 'Nova AI' });
+    }).save();
+    toast('PDF downloaded.');
+  } catch (error) {
+    // A real failure: report it (message only — never report content) and let the user choose; do not auto-open print.
+    console.error('PDF export failed:', error?.name || 'UnknownError', String(error?.message || '').slice(0, 200));
+    toast('PDF export failed. Please try again, or use Print and choose “Save as PDF”.', 6000);
+  } finally {
+    removeExportArtifacts(mark, iframesBefore);
+    pdfExporting = false;
+    button?.removeAttribute('aria-busy');
+  }
+}
+$('#pdfBtn')?.addEventListener('click', exportPdf);
+$('#printBtn')?.addEventListener('click', () => { if (!exportBlocked()) window.print(); });
 
 function reset() {
   profileInput.value = '';

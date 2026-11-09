@@ -190,6 +190,30 @@ Current test status:
 0 failed
 ```
 
+### Real-browser PDF export tests
+
+`npm test` runs only the Node unit tests (the 144 above) and does **not** start a browser. The PDF export is
+additionally covered by a separate suite in `test-browser/` that drives real Chromium against the real, vendored
+html2pdf.js (the library is never stubbed; only the `/api/*` calls are mocked, and failures are injected into the
+browser's canvas APIs). Run it separately:
+
+```bash
+# once: install the browser tooling without adding it to package.json
+npm install --no-save playwright@1.63.0
+npx playwright install chromium          # on a fresh Linux box: npx playwright install --with-deps chromium
+
+# every time
+npm run test:browser
+```
+
+- Tested with Playwright 1.63.0 and its matching Chromium build (Chromium only; Firefox/Safari are not covered).
+- Needs no API key and no network beyond the one-time browser download. It starts `local-dev.js` on a free port.
+- It takes about a minute, which is why it is not part of `npm test`.
+- Playwright is deliberately **not** a dependency: it is a large install (the browser download is hundreds of MB) that
+  the deployed app does not need, and adding it to `package.json` would make every `npm install`, including Vercel's,
+  pay for it. The trade-off is that the suite is not run automatically; run it before changing `exportPdf()`,
+  `prepareCloneForPdf()` or `vendor/html2pdf.bundle.min.js`.
+
 ---
 
 ## 💻 Run Locally
