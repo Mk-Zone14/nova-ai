@@ -361,6 +361,21 @@ The GitHub repository is:
 
 **[https://github.com/Mk-Zone14/nova-ai](https://github.com/Mk-Zone14/nova-ai)**
 
+### Function time limits (Vercel Hobby)
+
+`vercel.json` gives both API functions `maxDuration: 60`. Per Vercel's documentation, Hobby allows up to 300 s when Fluid compute is enabled (the default for projects created after April 2025) and up to 60 s when it is not, so 60 s is valid either way. Do not raise it above 60 without confirming Fluid compute is on for the project (Project Settings → Functions).
+
+The time budgets are layered so the failure you see is always ours, not the platform's:
+
+| Layer | Limit |
+| --- | --- |
+| Single model call (`analyze` / `narrative`) | 45 s |
+| Server budget per request | 50 s (`analyze` runs two calls inside it) |
+| Vercel `maxDuration` | 60 s |
+| Browser timeout | 65 s (sections) / 75 s (analysis) |
+
+`test/quality.test.js` fails if these drift out of order. To confirm what a deployment actually applied, run `vercel inspect <deployment-url> --json` and read each function's `timeout`.
+
 ---
 
 ## 🗺️ Roadmap

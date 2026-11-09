@@ -191,3 +191,21 @@ test('form validation moves focus to the field and marks it invalid; decorative 
   const icons = client.slice(client.indexOf('function icons'), client.indexOf('// Visible toast'));
   assert.match(icons, /aria-hidden/, 'lucide icons are decorative');
 });
+
+test('time budgets stay ordered: model call < server budget < maxDuration (<= 60 s Hobby floor) < browser timeouts', () => {
+  const num = (source, name) => Number(source.match(new RegExp(`${name}\\s*=\\s*([\\d_]+)`))[1].replace(/_/g, ''));
+  const vercel = JSON.parse(read('vercel.json'));
+  const analyze = read('api/analyze.js');
+  const narrative = read('api/narrative.js');
+  const client = read('client.js');
+  const analyzeBudget = num(analyze, 'TOTAL_BUDGET_MS');
+  const narrativeBudget = num(narrative, 'BUDGET_MS');
+  const callMax = num(narrative, 'CALL_MAX_MS');
+  for (const [file, budget, browser] of [['api/analyze.js', analyzeBudget, num(client, 'ANALYZE_TIMEOUT_MS')], ['api/narrative.js', narrativeBudget, num(client, 'SECTION_TIMEOUT_MS')]]) {
+    const maxMs = vercel.functions[file].maxDuration * 1000;
+    assert.ok(maxMs <= 60_000, `${file}: above the 60 s limit that applies when Fluid compute is off on Hobby`);
+    assert.ok(budget < maxMs, `${file}: server budget must finish before the platform kills the function`);
+    assert.ok(browser > maxMs, `${file}: the browser must outwait the platform so users see our error, not an abort`);
+  }
+  assert.ok(callMax < narrativeBudget);
+});
