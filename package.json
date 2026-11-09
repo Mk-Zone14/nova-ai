@@ -5,9 +5,11 @@
   "description": "AI-powered eligibility analysis for student opportunities.",
   "scripts": {
     "dev": "node local-dev.js",
-    "check": "node --check client.js && node --check api/analyze.js && node --check lib/eligibility.js && node --check lib/prompts.js && node --check lib/rate-limit.js && node --check resource-links.js && node --check report-model.js && node --check local-dev.js",
+    "check": "node --check client.js && node --check api/analyze.js && node --check api/narrative.js && node --check lib/eligibility.js && node --check lib/model.js && node --check lib/narrative.js && node --check lib/prompts.js && node --check lib/rate-limit.js && node --check resource-links.js && node --check report-model.js && node --check local-dev.js && node --check scripts/verify-groq.js",
     "lint": "npm run check",
     "test": "node --test",
+    "verify:groq": "node scripts/verify-groq.js",
+    "test:browser": "node --test --test-concurrency=1 test-browser/*.browser.js",
     "test:coverage": "node --test --experimental-test-coverage"
   },
   "engines": { "node": "24.x" }

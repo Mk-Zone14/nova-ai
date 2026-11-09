@@ -7,7 +7,9 @@ const { STATUS, VERDICT, normalizeRequirements, normalizeMatches, computeAssessm
 const {
   safe, arr, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError, list, presentationText, normalizeStatus,
   humanizeVerdict, requirementItems, statusCounts, biggestConcern, nextBestAction, contextCandidate,
-  detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText
+  detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
+  buildAssessmentPayload, mergeNarrative, hasInsights,
+  hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage
 } = model;
 
 const MODULES = ['requirements', 'strengths', 'gaps', 'documents', 'risks', 'strategy', 'resources'];
@@ -283,7 +285,7 @@ test('moduleContent shows honest empty states for an empty report and a default 
   assert.match(moduleContent('documents', empty).html, /No documents were identified/);
   assert.match(moduleContent('risks', empty).html, /No significant risks/);
   assert.match(moduleContent('resources', empty).html, /No resources were generated/);
-  assert.match(moduleContent('strategy', empty).html, /No cover letter was generated/);
+  assert.match(moduleContent('strategy', empty).html, /data-action="generate-cover-letter"/, 'offers to draft rather than claiming none exists');
   assert.equal(moduleContent('nope', empty).title, 'Evidence');
 });
 
@@ -315,4 +317,167 @@ test('buildReportText produces the plain-text brief and survives an empty report
   const empty = buildReportText();
   assert.match(empty, /Fit score: Not available from Nova\./);
   assert.match(empty, /Requirements: 0\/0 matched/);
+});
+
+// ---- on-demand sections ----------------------------------------------------------------------
+
+test('strategy offers Generate buttons, then loading, error and ready states per draft', () => {
+  const base = adaptNovaReport({});
+  const idle = strategyMarkup(base);
+  assert.match(idle, /data-action="generate-cover-letter"/);
+  assert.match(idle, /data-action="generate-interview"/);
+  assert.doesNotMatch(idle, /id="coverLetterCopy"/);
+
+  const loading = strategyMarkup(base, { coverLetter: 'loading', interview: 'loading' });
+  assert.match(loading, /Drafting your cover letter/);
+  assert.match(loading, /Preparing interview questions/);
+  assert.doesNotMatch(loading, /data-action="generate-/);
+
+  const failed = strategyMarkup(base, { coverLetter: 'error' });
+  assert.match(failed, /Couldn(?:'|&#039;)t draft the cover letter/);
+  assert.match(failed, /data-action="generate-cover-letter"/, 'error state offers retry');
+
+  const saved = strategyMarkup(base, { canGenerate: false });
+  assert.match(saved, /Run a new analysis/);
+  assert.doesNotMatch(saved, /data-action="generate-/);
+
+  const ready = adaptNovaReport({ coverLetter: 'Dear team,\nHello.', interviewQuestions: [{ question: 'Why us?', whyAsked: 'Fit', suggestedAnswer: 'Because <b>x</b>' }] });
+  const html = strategyMarkup(ready, { coverLetter: 'loading' });
+  assert.match(html, /id="coverLetterCopy"/, 'existing content wins over a stale loading flag');
+  assert.match(html, /Why us\?/);
+  assert.doesNotMatch(html, /<b>x<\/b>/, 'model text is escaped');
+  assertSafeMarkup(html, 'strategy ready');
+});
+
+test('insight-dependent modules show pending and retry panels until insights arrive', () => {
+  for (const module of ['strengths', 'gaps', 'documents', 'risks', 'resources']) {
+    assert.match(moduleContent(module, adapted(), { insights: 'loading' }).html, /still preparing/i, module);
+    assert.match(moduleContent(module, adapted(), { insights: 'error' }).html, /data-action="retry-insights"/, module);
+  }
+  assert.equal(moduleContent('requirements', adapted(), { insights: 'loading' }).title, 'Requirements', 'verdict-backed modules never wait');
+  assert.doesNotMatch(moduleContent('requirements', adapted(), { insights: 'loading' }).html, /still preparing/i);
+  const strategy = moduleContent('strategy', adaptNovaReport({}), { insights: 'loading' }).html;
+  assert.match(strategy, /still preparing/i);
+  assert.match(strategy, /data-action="generate-cover-letter"/, 'drafts do not depend on insights');
+});
+
+test('buildAssessmentPayload sends only verified verdict data in the canonical shape the server expects', () => {
+  const report = adapted();
+  const payload = buildAssessmentPayload(report);
+  assert.equal(payload.verdict, report.eligibilityVerdict);
+  assert.ok(payload.rows.length >= 1 && payload.rows.length <= 25);
+  for (const row of payload.rows) {
+    assert.ok(['Matched', 'Partial Match', 'Missing', 'Unknown'].includes(row.status), row.status);
+    assert.equal(typeof row.hardEligibility, 'boolean');
+    assert.equal(typeof row.mandatory, 'boolean');
+    assert.ok(row.requirement.length > 0 && row.requirement.length <= 300);
+    assert.deepEqual(Object.keys(row).sort(), ['hardEligibility', 'mandatory', 'requirement', 'status']);
+  }
+  const { validateAssessment } = require('../lib/narrative');
+  assert.ok(validateAssessment(payload), 'payload passes the server validator unchanged');
+});
+
+test('mergeNarrative folds generated sections in without losing the verdict', () => {
+  const report = adapted();
+  const merged = mergeNarrative(report, { coverLetter: 'Dear team', interviewQuestions: [{ question: 'Q' }] });
+  assert.equal(merged.coverLetter, 'Dear team');
+  assert.equal(merged.interviewQuestions.length, 1);
+  assert.equal(merged.eligibilityVerdict, report.eligibilityVerdict);
+  assert.equal(merged.overallMatchScore, report.overallMatchScore);
+  assert.equal(mergeNarrative(report, null).eligibilityVerdict, report.eligibilityVerdict);
+  assert.equal(mergeNarrative(report, ['x']).coverLetter, report.coverLetter, 'arrays are ignored');
+});
+
+test('unavailable insights explain why instead of showing misleading empty states', () => {
+  const html = moduleContent('risks', adapted(), { insights: 'unavailable' });
+  assert.match(html.html, /weren.t saved/);
+  assert.doesNotMatch(html.html, /data-action/, 'nothing to retry without the original inputs');
+  assert.equal(html.subtitle, 'Not saved with this analysis');
+});
+
+test('hasInsights recognises generated sections, legacy reports, and a verdict-only report', () => {
+  assert.equal(hasInsights(adaptNovaReport({})), false);
+  assert.equal(hasInsights(adapted()), true, 'reports from before the split already carry insights');
+  const verdictOnly = adaptNovaReport({ eligibilityVerdict: 'Eligible' });
+  assert.equal(hasInsights(mergeNarrative(verdictOnly, {}, 'insights')), true, 'an insights section that legitimately found nothing is still generated');
+  assert.equal(hasInsights(mergeNarrative(verdictOnly, { coverLetter: 'x' }, 'coverLetter')), false);
+});
+
+// ---- PDF export helpers ----------------------------------------------------------------------
+
+test('hasModernColor flags the colour functions html2canvas cannot parse, and nothing else', () => {
+  for (const bad of ['color(srgb 0.0666667 0.0862745 0.113725 / 0.94)', 'color-mix(in srgb, red 50%, blue)', 'lab(50% 40 59)', 'oklch(60% 0.2 30)', 'oklab(0.5 0.1 0.1)', 'lch(50% 30 40)', 'hwb(30 10% 10%)', 'light-dark(#fff, #000)', 'linear-gradient(red, color(srgb 1 0 0))', 'COLOR(srgb 1 0 0)']) {
+    assert.equal(hasModernColor(bad), true, bad);
+  }
+  for (const ok of ['rgb(1, 2, 3)', 'rgba(1, 2, 3, 0.5)', '#fff', 'transparent', 'none', 'hsl(10 20% 30%)', 'background-color', '', null, undefined, 42]) {
+    assert.equal(hasModernColor(ok), false, String(ok));
+  }
+});
+
+test('modernColorToRgba converts the srgb form Chrome emits exactly, and refuses everything it cannot convert', () => {
+  assert.equal(modernColorToRgba('color(srgb 0.0666667 0.0862745 0.113725 / 0.94)'), 'rgba(17, 22, 29, 0.94)');
+  assert.equal(modernColorToRgba('color(srgb 1 0 0)'), 'rgba(255, 0, 0, 1)', 'alpha defaults to 1');
+  assert.equal(modernColorToRgba('color(srgb 100% 50% 0% / 50%)'), 'rgba(255, 128, 0, 0.5)', 'percentages');
+  assert.equal(modernColorToRgba('  color(srgb 2 -1 0.5 / 3)  '), 'rgba(255, 0, 128, 1)', 'clamped');
+  for (const unsupported of ['color(display-p3 1 0 0)', 'color(srgb 1 0)', 'color(srgb a b c)', 'lab(50% 40 59)', 'rgb(1,2,3)', '', null, undefined]) {
+    assert.equal(modernColorToRgba(unsupported), null, String(unsupported));
+  }
+});
+
+test('exportBlockReason rejects export only while details are loading or failed', () => {
+  assert.match(exportBlockReason({ insights: 'loading' }), /still preparing/i);
+  assert.match(exportBlockReason({ insights: 'error' }), /could not be prepared/i);
+  assert.equal(exportBlockReason({ insights: 'unavailable' }), null, 'restored reports can export what they have');
+  assert.equal(exportBlockReason({}), null);
+  assert.equal(exportBlockReason(), null);
+  assert.equal(exportBlockReason({ coverLetter: 'loading', interview: 'loading' }), null, 'drafts are optional and never block export');
+});
+
+test('pdfTitle and pdfFilename are derived safely from the report', () => {
+  const report = { opportunitySummary: { role: 'Product Engineering Intern' } };
+  assert.equal(pdfTitle(report), 'Nova fit brief — Product Engineering Intern');
+  assert.equal(pdfTitle({}), 'Nova fit brief — Eligibility assessment');
+  assert.equal(pdfTitle({ opportunityName: '  Spaced \n out  ' }), 'Nova fit brief — Spaced out');
+  assert.ok(pdfTitle({ opportunityName: 'x'.repeat(500) }).length < 150);
+  const day = new Date('2026-11-08T10:00:00Z');
+  assert.equal(pdfFilename(report, day), 'nova-fit-brief-product-engineering-intern-2026-11-08.pdf');
+  assert.equal(pdfFilename({}, day), 'nova-fit-brief-2026-11-08.pdf', 'no role: no dangling hyphen');
+  assert.equal(pdfFilename({ opportunityName: 'Ünïcode Fellowship / 2026 *?' }, day), 'nova-fit-brief-unicode-fellowship-2026-2026-11-08.pdf', 'accents are stripped, not dropped with their letter');
+  assert.equal(pdfFilename({ opportunityName: '日本語' }, day), 'nova-fit-brief-2026-11-08.pdf', 'non-latin only falls back cleanly');
+  assert.match(pdfFilename({ opportunityName: 'a'.repeat(200) }, day), /^nova-fit-brief-a{40}-2026-11-08\.pdf$/);
+  assert.match(pdfFilename(report, new Date('nope')), /-report\.pdf$/, 'invalid date does not throw');
+  for (const hostile of ['../../etc/passwd', 'a"b\\c<d>', 'x\u0000y']) {
+    assert.match(pdfFilename({ opportunityName: hostile }, day), /^nova-fit-brief-[a-z0-9-]*2026-11-08\.pdf$/, hostile);
+  }
+});
+
+// ---- error messages ----------------------------------------------------------------------------
+
+test('responseErrorMessage prefers our own safe message and otherwise describes the status', () => {
+  assert.equal(responseErrorMessage(429, '{"error":"Too many analysis requests. Please wait a minute and try again."}'), 'Too many analysis requests. Please wait a minute and try again.');
+  assert.equal(responseErrorMessage(400, JSON.stringify({ error: '  padded  ' })), 'padded');
+  assert.equal(responseErrorMessage(502, JSON.stringify({ error: 'x'.repeat(1000) })).length, 300, 'capped');
+  // platform pages and proxies do not speak JSON
+  assert.match(responseErrorMessage(504, '<html>An error occurred with your deployment FUNCTION_INVOCATION_TIMEOUT</html>'), /took too long/);
+  assert.match(responseErrorMessage(408, ''), /took too long/);
+  assert.match(responseErrorMessage(429, 'Too Many Requests'), /Too many requests/);
+  assert.match(responseErrorMessage(413, 'Payload Too Large'), /too large/);
+  assert.match(responseErrorMessage(500, 'Internal Server Error'), /problem on its side/);
+  assert.match(responseErrorMessage(503, undefined), /problem on its side/);
+  assert.match(responseErrorMessage(404, 'nope'), /could not be completed/);
+  for (const odd of ['{"error":42}', '{"error":""}', '{"error":null}', '[]', 'null', '{"message":"x"}']) {
+    assert.match(responseErrorMessage(502, odd), /problem on its side/, odd);
+  }
+  assert.doesNotMatch(responseErrorMessage(500, '<html>stack at /var/task/index.js</html>'), /var\/task|html/i, 'raw bodies are never echoed');
+});
+
+test('friendlyError describes network failures and keeps hiding provider and configuration details', () => {
+  for (const raw of ['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed', 'network request failed']) {
+    assert.match(friendlyError(raw), /Could not reach Nova/, raw);
+  }
+  assert.match(friendlyError('Add GROQ_API_KEY to Vercel Environment Variables'), /unavailable/);
+  assert.match(friendlyError('Invalid API key provided'), /unavailable/);
+  assert.equal(friendlyError('Analysis is temporarily unavailable. Please try again later.'), 'Analysis is temporarily unavailable. Please try again later.', 'our own generic messages pass through');
+  assert.equal(friendlyError('Nova could not complete the analysis. Please try again.'), 'Nova could not complete the analysis. Please try again.');
+  assert.equal(friendlyError("Nova's AI service is busy right now. Please try again in a minute."), "Nova's AI service is busy right now. Please try again in a minute.");
 });
