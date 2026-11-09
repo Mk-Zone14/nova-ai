@@ -87,9 +87,16 @@ test('rejects methods other than POST and declares the allowed method', async ()
 test('does not call the provider when its secret is missing', async () => {
   delete process.env.GROQ_API_KEY;
   global.fetch = async () => { throw new Error('must not call provider'); };
-  const res = await run();
+  const logs = [];
+  const original = console.error;
+  console.error = (...args) => logs.push(args.map(String).join(' '));
+  let res;
+  try { res = await run(); } finally { console.error = original; }
   assert.equal(res.statusCode, 503);
-  assert.match(res.body.error, /not configured/);
+  assert.deepEqual(Object.keys(res.body), ['error']);
+  assert.match(res.body.error, /temporarily unavailable/i);
+  assert.doesNotMatch(JSON.stringify(res.body), /GROQ|Vercel|API key|environment|redeploy/i, 'visitors are not told how the server is configured');
+  assert.match(logs.join('\n'), /GROQ_API_KEY is not set/, 'the operator is told, in the log');
 });
 
 test('rejects non-JSON requests', async () => {
@@ -136,12 +143,52 @@ test('enforces the opportunity size limit before calling the provider', async ()
   assert.equal(res.statusCode, 400);
 });
 
-test('returns a generic authentication error without exposing the secret', async () => {
+test('upstream authentication failures become a generic 503: no secret, no config advice, details only in the log', async () => {
   process.env.GROQ_API_KEY = 'private-test-key';
   global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'key private-test-key' } }) });
-  const res = await run();
-  assert.equal(res.statusCode, 401);
-  assert.doesNotMatch(JSON.stringify(res.body), /private-test-key/);
+  const logs = [];
+  const original = console.error;
+  console.error = (...args) => logs.push(args.map(String).join(' '));
+  let res;
+  try { res = await run(); } finally { console.error = original; }
+  assert.equal(res.statusCode, 503, 'not 401: the visitor did nothing wrong');
+  assert.deepEqual(Object.keys(res.body), ['error']);
+  assert.doesNotMatch(JSON.stringify(res.body), /private-test-key|GROQ|Vercel|environment/i);
+  assert.match(logs.join('\n'), /upstream status 401/);
+  assert.match(logs.join('\n'), /Check GROQ_API_KEY/);
+  assert.doesNotMatch(logs.join('\n'), /private-test-key/, 'the key never reaches the log');
+});
+
+test('a provider rate limit is reported as "busy, try again" with Retry-After, not as an opaque failure', async () => {
+  process.env.GROQ_API_KEY = 'test-key';
+  global.fetch = async () => ({ ok: false, status: 429, json: async () => ({ error: { message: 'rate limit for org-secret-123' } }) });
+  const original = console.error;
+  console.error = () => {};
+  let res;
+  try { res = await run(); } finally { console.error = original; }
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.headers['Retry-After'], '30');
+  assert.match(res.body.error, /busy/i);
+  assert.doesNotMatch(JSON.stringify(res.body), /org-secret-123|Groq/);
+});
+
+test('error responses contain only a safe message: no stack traces, provider text or internals', async () => {
+  process.env.GROQ_API_KEY = 'test-key';
+  const original = console.error;
+  console.error = () => {};
+  try {
+    for (const failure of [
+      async () => ({ ok: false, status: 500, json: async () => ({ error: { message: 'stack at /var/task/node_modules/x.js:1:1' } }) }),
+      async () => { throw new TypeError('fetch failed: connect ECONNREFUSED 10.1.2.3:443'); },
+      async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'not json {' } }] }) })
+    ]) {
+      global.fetch = failure;
+      const res = await run();
+      assert.ok(res.statusCode >= 500, String(res.statusCode));
+      assert.deepEqual(Object.keys(res.body), ['error']);
+      assert.doesNotMatch(JSON.stringify(res.body), /stack|\/var\/task|node_modules|ECONNREFUSED|10\.1\.2\.3|TypeError|Groq/i);
+    }
+  } finally { console.error = original; }
 });
 
 test('maps non-authentication provider failures to a generic gateway error', async () => {
@@ -159,7 +206,7 @@ test('rejects malformed model output before it reaches the client', async () => 
   assert.equal(res.statusCode, 502);
 });
 
-test('runs extract, match and narrative stages and returns a code-computed report', async () => {
+test('returns a code-computed verdict from exactly two model calls and no narrative writing', async () => {
   process.env.GROQ_API_KEY = 'test-key';
   const calls = [];
   const prompts = [];
@@ -172,11 +219,11 @@ test('runs extract, match and narrative stages and returns a code-computed repor
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Cache-Control'], 'no-store');
   assert.equal(res.headers['X-Content-Type-Options'], 'nosniff');
-  assert.deepEqual(calls, ['EXTRACT', 'MATCH', 'NARRATIVE']);
+  assert.deepEqual(calls, ['EXTRACT', 'MATCH'], 'the slow writing must not block the verdict');
   for (const body of prompts) {
     assert.equal(body.temperature, 0.2);
     assert.match(body.messages[0].content, /Return ONLY valid JSON/);
-    assert.match(body.messages[0].content, /untrusted reference data/);
+    assert.match(body.messages[0].content, /untrusted/);
   }
 
   const out = report(res);
@@ -184,16 +231,16 @@ test('runs extract, match and narrative stages and returns a code-computed repor
   assert.equal(out.overallMatchScore, 83); // (3 + 2) / (3 + 2 + 1)
   assert.equal(out.evidenceCoverage, 67); // 2 of 3 requirements have a verified quote
   assert.equal(out.confidenceScore, out.evidenceCoverage);
-  assert.equal(out.coverLetter, 'Dear Atlas Labs,');
-  assert.equal(out.narrativeAvailable, true);
-  assert.equal(out.acceptanceProbability, undefined, 'model-supplied probability must be dropped');
   assert.equal(out.requirementMapping.length, 3);
+  for (const key of ['coverLetter', 'interviewQuestions', 'strengths', 'learningResources', 'acceptanceProbability', 'narrativeAvailable']) {
+    assert.equal(out[key], undefined, `${key} belongs to /api/narrative`);
+  }
 });
 
 test('fabricated profile evidence is downgraded and blocks an Eligible verdict', async () => {
   process.env.GROQ_API_KEY = 'test-key';
   const fabricated = { matches: [{ ...MATCH.matches[0], evidenceQuote: 'Final-year undergraduate at MIT' }, ...MATCH.matches.slice(1)] };
-  global.fetch = stagedFetch({ EXTRACT, MATCH: fabricated, NARRATIVE });
+  global.fetch = stagedFetch({ EXTRACT, MATCH: fabricated });
   const out = report(await run());
   assert.equal(out.eligibilityVerdict, 'Needs verification');
   const row = out.requirementMapping.find((item) => item.hardEligibility);
@@ -205,22 +252,11 @@ test('fabricated profile evidence is downgraded and blocks an Eligible verdict',
 test('requirements whose source quote is not in the opportunity text are dropped', async () => {
   process.env.GROQ_API_KEY = 'test-key';
   const invented = { requirements: [...EXTRACT.requirements, { requirement: 'Must hold a PhD', sourceQuote: 'applicants must hold a PhD', mandatory: true, hardEligibility: true }] };
-  global.fetch = stagedFetch({ EXTRACT: invented, MATCH, NARRATIVE });
+  global.fetch = stagedFetch({ EXTRACT: invented, MATCH });
   const out = report(await run());
   assert.equal(out.requirementMapping.length, 3);
   assert.equal(out.eligibilityVerdict, 'Eligible');
   assert.equal(out._evidenceTrace.droppedRequirements.length, 1);
-});
-
-test('a narrative-stage failure keeps the verified verdict', async () => {
-  process.env.GROQ_API_KEY = 'test-key';
-  global.fetch = stagedFetch({ EXTRACT, MATCH, NARRATIVE: 'not json' });
-  const res = await run();
-  assert.equal(res.statusCode, 200);
-  const out = report(res);
-  assert.equal(out.narrativeAvailable, false);
-  assert.equal(out.eligibilityVerdict, 'Eligible');
-  assert.equal(out.coverLetter, undefined);
 });
 
 test('returns 422 when no verifiable requirements can be extracted', async () => {
@@ -268,13 +304,20 @@ test('maps malformed provider JSON and fetch errors to a safe gateway error', as
 test('rate limits repeated valid requests per client and returns retry guidance', async () => {
   process.env.GROQ_API_KEY = 'test-key';
   global.fetch = stagedFetch({ EXTRACT, MATCH, NARRATIVE });
-  const headers = { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.10' };
+  const socket = { remoteAddress: '203.0.113.10' };
+  const headers = { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.1' };
   for (let index = 0; index < handler.limits.RATE_LIMIT_MAX_REQUESTS; index++) {
-    assert.equal((await run({ headers })).statusCode, 200);
+    assert.equal((await run({ headers, socket })).statusCode, 200);
   }
-  const limited = await run({ headers });
+  const limited = await run({ headers, socket });
   assert.equal(limited.statusCode, 429);
   assert.equal(limited.headers['Retry-After'], '60');
+  assert.equal(JSON.stringify(limited.body), JSON.stringify({ error: 'Too many analysis requests. Please wait a minute and try again.' }), 'generic message, no infrastructure details');
+  // rotating a forged forwarding header does not buy a fresh allowance
+  const forged = await run({ headers: { ...headers, 'x-forwarded-for': '198.51.100.2' }, socket });
+  assert.equal(forged.statusCode, 429);
+  // a genuinely different client is unaffected
+  assert.equal((await run({ headers, socket: { remoteAddress: '203.0.113.11' } })).statusCode, 200);
 });
 
 test('rate-limit and model-validation utilities cover expiry and invalid values', () => {
