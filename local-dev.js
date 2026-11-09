@@ -1,10 +1,14 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const analyze = require('./api/analyze');
+const routes = {
+    '/api/analyze': require('./api/analyze'),
+    '/api/narrative': require('./api/narrative')
+};
 
 const root = __dirname;
-const MAX_REQUEST_BYTES = 25_000;
+// Profile (8k) + opportunity (12k) + assessment rows for /api/narrative.
+const MAX_REQUEST_BYTES = 60_000;
 
 // Load local secrets without overriding values explicitly supplied by the environment.
 for (const fileName of ['.env.local', '.env']) {
@@ -38,7 +42,7 @@ function adaptVercelResponse(res) {
     return res;
 }
 
-function handleAnalyze(req, res) {
+function handleApi(handler, req, res) {
     let bytes = 0;
     const chunks = [];
     let rejected = false;
@@ -57,7 +61,7 @@ function handleAnalyze(req, res) {
     req.on('end', async () => {
         if (rejected) return sendResponse(res, 413, { error: 'Request body is too large.' });
         req.body = Buffer.concat(chunks).toString('utf8');
-        await analyze(req, adaptVercelResponse(res));
+        await handler(req, adaptVercelResponse(res));
     });
 }
 
@@ -75,8 +79,9 @@ const server = http.createServer((req, res) => {
         return sendResponse(res, 400, { error: 'Bad request.' });
     }
 
-    if (req.method === 'POST' && url.pathname === '/api/analyze') return handleAnalyze(req, res);
-    if (url.pathname === '/api/analyze') return sendResponse(res, 405, { error: 'Method not allowed.' });
+    const handler = Object.hasOwn(routes, url.pathname) ? routes[url.pathname] : null;
+    if (handler && req.method === 'POST') return handleApi(handler, req, res);
+    if (handler) return sendResponse(res, 405, { error: 'Method not allowed.' });
     if (req.method !== 'GET' && req.method !== 'HEAD') return sendResponse(res, 405, { error: 'Method not allowed.' });
 
     const target = url.pathname === '/' ? 'index.html' : path.normalize(url.pathname).replace(/^([/\\])+/, '');

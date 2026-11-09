@@ -161,6 +161,8 @@ Nova AI is designed with security in mind.
 * External links use `noopener noreferrer`.
 * Security headers are configured through Vercel.
 * User-facing analysis does not expose the underlying API key.
+* **Untrusted text never shares a channel with instructions.** Your profile, the opportunity text, requirement text and the verified assessment are sent to the model as a single JSON object in the `user` message; the `system` message holds only fixed instructions that say that object is data, not commands. JSON encoding escapes quotes, backslashes and newlines, so pasted text cannot close a delimiter or add fields (there are no in-band tags to break out of). This is a boundary, not a guarantee that a model can never be persuaded by wording inside the data: the guarantees that matter are enforced in code (evidence quotes must exist verbatim in your text, the verdict and statuses are computed in code, and responses are schema-filtered). See `lib/prompts.js` and `test/prompt-injection.test.js`.
+* **Saved history is retention-limited.** Your last 10 reports are kept in this browser's `localStorage` (key `ocopilot-history`) and nowhere else. Each entry gets a save time and an expiry **30 days later**; expired, malformed and unreadable entries are deleted when the page loads and again before anything is displayed or restored. You can delete one entry or clear everything at any time. Entries saved by earlier versions (no expiry field) are migrated on first load: the save time is recovered from the entry id, so one older than 30 days is deleted, and any other gets the remainder of its 30 days (an id that is not a plausible timestamp gets a full 30 days from migration). `localStorage` is **not encrypted** and is readable by anyone who can use this browser profile or by script on this origin; Nova states this in the interface. There is currently no history export. Stored reports include the evidence quotes and drafted text from your inputs, so treat them as personal data. The history panel ("Saved on this device") sits below the workspace and the report, so saved analyses can be reopened or deleted straight after a reload without running a new analysis.
 
 The production API key is stored as a sensitive Vercel environment variable and is never committed to this repository.
 
@@ -185,10 +187,34 @@ npm run test
 Current test status:
 
 ```text
-61 tests
-61 passed
+210 tests
+210 passed
 0 failed
 ```
+
+### Real-browser PDF export tests
+
+`npm test` runs only the Node unit tests (the 210 above) and does **not** start a browser. The PDF export is
+additionally covered by a separate suite in `test-browser/` (PDF export plus saved-history retention) that drives real Chromium against the real, vendored
+html2pdf.js (the library is never stubbed; only the `/api/*` calls are mocked, and failures are injected into the
+browser's canvas APIs). Run it separately:
+
+```bash
+# once: install the browser tooling without adding it to package.json
+npm install --no-save playwright@1.63.0
+npx playwright install chromium          # on a fresh Linux box: npx playwright install --with-deps chromium
+
+# every time
+npm run test:browser
+```
+
+- Tested with Playwright 1.63.0 and its matching Chromium build (Chromium only; Firefox/Safari are not covered).
+- Needs no API key and no network beyond the one-time browser download. It starts `local-dev.js` on a free port.
+- It takes about a minute, which is why it is not part of `npm test`.
+- Playwright is deliberately **not** a dependency: it is a large install (the browser download is hundreds of MB) that
+  the deployed app does not need, and adding it to `package.json` would make every `npm install`, including Vercel's,
+  pay for it. The trade-off is that the suite is not run automatically; run it before changing `exportPdf()`,
+  `prepareCloneForPdf()` or `vendor/html2pdf.bundle.min.js`.
 
 ---
 
@@ -217,6 +243,15 @@ GROQ_API_KEY=your_groq_api_key
 
 Optional, recommended in production: set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (a free Upstash Redis database works) so the rate limit is shared across all serverless instances. Add the same variables to Vercel for Production and Preview.
 
+How the limiter identifies a client:
+
+* **On Vercel** it uses the platform-set `x-vercel-forwarded-for` header (falling back to `x-real-ip` / `x-forwarded-for`). This relies on Vercel's system environment variables being exposed to functions (the project default), because the limiter checks the `VERCEL` variable to decide whether to trust those headers.
+* **Everywhere else** (local dev, other hosts) forwarding headers are **ignored** and the socket address is used, because otherwise a caller could send a new `X-Forwarded-For` on every request and never be limited. Behind your own reverse proxy that means all clients share the proxy's address.
+* IPv6 clients are grouped by /64 prefix; invalid addresses are discarded. With no usable address at all, clients are separated by a hash of the user-agent and language headers instead of sharing one bucket.
+* Limits: 10 analyses and 20 narrative sections per client per minute (fixed window, so a short burst across a window boundary can briefly reach double). Rate-limit responses are a generic message plus `Retry-After`.
+* If Redis is unreachable the limiter fails **open** to the per-instance fallback (so an outage cannot take Nova down), logs the error type once a minute, and the fallback is weaker. Without the two variables on Vercel it logs a one-time warning that limiting is per-instance only.
+* `UPSTASH_REDIS_REST_URL` must be `https://`; plain `http://` is accepted only for a loopback emulator.
+
 ### 4. Start the development server
 
 ```bash
@@ -233,7 +268,8 @@ The local development server will start using the project's Node.js development 
 nova-ai/
 │
 ├── api/
-│   └── analyze.js
+│   ├── analyze.js       # verdict (extract → match → compute)
+│   └── narrative.js     # on-demand insights / cover letter / interview
 ├── lib/                 # eligibility core, prompts, rate limiter
 ├── vendor/              # self-hosted third-party scripts + hashes
 │
@@ -252,6 +288,7 @@ nova-ai/
 ├── print.css
 ├── theme-init.js
 ├── resource-links.js
+├── report-model.js      # pure report logic + markup builders (unit-tested)
 │
 ├── local-dev.js
 ├── package.json
@@ -275,7 +312,7 @@ The verdict and score are computed **in code**, not by the model. The LLM only p
    * Otherwise → **Eligible**
    * Fit score = weighted share of earned credit (hard ×3, mandatory ×2, preferred ×1; Matched = 1, Partial = 0.5, Missing/Unknown = 0)
    * **Evidence coverage** = % of requirements backed by a verified quote
-4. **Narrative** — cover letter, roadmap, interview questions, resources and resume feedback are generated last, told the computed statuses are final, and cannot set the verdict or any score. If this step fails, the verified verdict is still returned.
+4. **Narrative (on demand, separate endpoint `/api/narrative`)** — the verdict is returned after steps 1–3 only (two model calls), so it appears within seconds. The browser then loads **insights** (strengths, gaps, risks, documents, resources, resume/ATS feedback) automatically in the background, and generates the **cover letter** and **interview questions** only when you click the button. Each section is told the computed statuses are final and cannot set the verdict or any score. The browser sends the verified verdict and requirement statuses back with each request; the server re-validates that payload (shape, allowed statuses, size) and strips any fields a section isn't allowed to return. If a section fails, the verdict is unaffected and the section can be retried. Your profile and opportunity text are kept in memory only for that, never written to local history, so an analysis restored from history shows what was already generated but cannot generate more.
 
 Known limits: the ATS and resume-strength scores are still model-estimated, and "Eligible" with zero hard requirements flagged means nothing disqualifying was *checked*, not that nothing exists. Always confirm against the official criteria.
 
@@ -325,6 +362,44 @@ Production deployment:
 The GitHub repository is:
 
 **[https://github.com/Mk-Zone14/nova-ai](https://github.com/Mk-Zone14/nova-ai)**
+
+### Function time limits (Vercel Hobby)
+
+`vercel.json` gives both API functions `maxDuration: 60`. Per Vercel's documentation, Hobby allows up to 300 s when Fluid compute is enabled (the default for projects created after April 2025) and up to 60 s when it is not, so 60 s is valid either way. Do not raise it above 60 without confirming Fluid compute is on for the project (Project Settings → Functions).
+
+The time budgets are layered so the failure you see is always ours, not the platform's:
+
+| Layer | Limit |
+| --- | --- |
+| Single model call (`analyze` / `narrative`) | 45 s |
+| Server budget per request | 50 s (`analyze` runs two calls inside it) |
+| Vercel `maxDuration` | 60 s |
+| Browser timeout | 65 s (sections) / 75 s (analysis) |
+
+`test/quality.test.js` fails if these drift out of order. To confirm what a deployment actually applied, run `vercel inspect <deployment-url> --json` and read each function's `timeout`.
+
+### Verifying the real Groq integration
+
+The automated tests use a mocked provider, so they prove our handling of Groq's responses, not the model's behaviour. To check the real thing yourself:
+
+```bash
+GROQ_API_KEY=<your key> npm run verify:groq        # optional: GROQ_MODEL=<model id>
+```
+
+It runs the bundled sample profile and the Atlas Labs internship through the production handlers: two model calls for the verdict, then one call each for insights, cover letter and interview prep (five calls in total). It refuses to run without a key and never prints it. Each call also logs one line (`Groq call ok: model=… ms=… prompt_tokens=… completion_tokens=… finish=…`), so you can read real latency and token cost. The same line appears in the Vercel runtime logs in production (Hobby keeps logs for one hour).
+
+The script exits non-zero on any `FAIL`. What it checks, and what only you can judge:
+
+| Automatic | You must read it yourself |
+| --- | --- |
+| HTTP 200 per call and latency against the 50 s budget | Whether each requirement's status matches what the profile actually says (the table it prints) |
+| Verdict is a known value, 3+ requirements extracted | Whether the cover letter is honest and sounds like the student |
+| Every requirement quote exists in the opportunity text | Whether interview answers are specific rather than generic |
+| Every Matched/Partial evidence quote exists in the profile | Whether any learning-resource URL looks invented |
+| How many of the model's claims the code downgraded (a high count means overclaiming) | |
+| Cover letter length, `[placeholders]`, skills absent from the profile (heuristic) | |
+
+Things worth trying only after a baseline run, one at a time and re-running the script each time: a lower reasoning effort or a smaller `GROQ_MODEL` if latency is near the budget. Neither has been tested here.
 
 ---
 

@@ -40,7 +40,7 @@
         <div class="eyebrow"><span class="eyebrow-mark"></span>Nova / Opportunity intelligence</div>
         <h1>Know before<br>you <em>apply.</em></h1>
         <p>Your profile. The opportunity. The evidence between them. Nova turns the comparison into a decision you can trust.</p>
-        <div class="hero-notes" aria-label="What Nova compares"><span>Profile + opportunity</span><span>Evidence-led</span><span>Human-readable</span></div>
+        <div class="hero-notes"><span>Profile + opportunity</span><span>Evidence-led</span><span>Human-readable</span></div>
         <div class="hero-actions">
           <a class="hero-cta" href="#workspace">Build my fit brief <i data-lucide="arrow-down-right"></i></a>
           <a class="hero-secondary" href="#sample-decision">See a sample decision <i data-lucide="arrow-up-right"></i></a>
@@ -71,7 +71,7 @@
         </div>
         <p>Give Nova the evidence it needs to investigate your fit. Your inputs stay in this browser until you choose to analyze.</p>
       </div>
-      <div class="sample-tools" aria-label="Sample data">
+      <div class="sample-tools" role="group" aria-label="Sample data">
         <button class="sample-primary" id="sampleDecisionBtn" type="button">See a sample decision <i data-lucide="sparkles"></i></button>
         <details class="sample-menu">
           <summary class="sample-menu-trigger">Choose another sample <i data-lucide="chevron-down"></i></summary>
@@ -94,7 +94,7 @@
             </div>
             <span class="character-count" id="profileCount">0 / 8,000</span>
           </div>
-          <textarea id="profileInput" maxlength="8000" aria-label="Student profile or resume" aria-describedby="profileHelp" placeholder="Paste your profile or upload a resume."></textarea>
+          <textarea id="profileInput" maxlength="8000" aria-describedby="profileHelp" placeholder="Paste your profile or upload a resume."></textarea>
           <div class="input-footer" id="profileHelp">
             <div class="footer-actions">
               <label class="text-action" for="resumeUpload"><i data-lucide="upload"></i>Upload resume</label>
@@ -113,7 +113,7 @@
             </div>
             <span class="character-count" id="opportunityCount">0 / 12,000</span>
           </div>
-          <textarea id="opportunityInput" maxlength="12000" aria-label="Opportunity details" aria-describedby="opportunityHelp" placeholder="Paste the full opportunity description."></textarea>
+          <textarea id="opportunityInput" maxlength="12000" aria-describedby="opportunityHelp" placeholder="Paste the full opportunity description."></textarea>
           <div class="input-footer" id="opportunityHelp">
             <button class="text-action" id="sampleOpportunity" type="button">Use sample</button>
             <span>Requirements, dates, and documents are mapped automatically.</span>
@@ -127,11 +127,11 @@
           <button class="analyze-button" id="analyzeBtn" type="button"><span>Build my fit brief</span><i data-lucide="arrow-up-right"></i></button>
         </div>
       </div>
-      <p class="privacy-note" id="privacyNote">Building a brief sends your profile and the opportunity text to Groq, our third-party AI provider. Nova&rsquo;s server does not store them. Your last 10 reports are saved in this browser only, and you can clear them from the history panel. Resumes can contain personal details, so share only what you&rsquo;re comfortable with.</p>
+      <p class="privacy-note" id="privacyNote">Building a brief sends your profile and the opportunity text to Groq, our third-party AI provider. Nova&rsquo;s server does not store them. Your last 10 reports are saved in this browser only, deleted automatically after 30 days, and you can delete them sooner from the history panel. Browser storage is not encrypted, so anyone who uses this browser profile can read them. Resumes can contain personal details, so share only what you&rsquo;re comfortable with.</p>
     </section>
 
-    <section id="loadingPanel" aria-live="polite" class="loading-panel hidden" aria-labelledby="loadingTitle" aria-busy="true">
-      <div class="loading-head"><div class="orbit"><i data-lucide="scan-search"></i></div><div><div class="eyebrow"><span class="eyebrow-mark"></span>Nova is reading</div><h2 id="loadingTitle">Building your fit brief…</h2><p id="loadingText">Reading opportunity.</p></div></div>
+    <section id="loadingPanel" aria-live="polite" class="loading-panel hidden" aria-labelledby="loadingTitle" aria-busy="false">
+      <div class="loading-head"><div class="orbit"><i data-lucide="scan-search"></i></div><div><div class="eyebrow"><span class="eyebrow-mark"></span>Nova is reading</div><h2 id="loadingTitle" tabindex="-1">Building your fit brief…</h2><p id="loadingText">Reading opportunity.</p></div></div>
       <div class="loading-steps" aria-hidden="true"><span class="active">Reading opportunity</span><span>Mapping evidence</span><span>Checking blockers</span><span>Preparing next moves</span></div>
       <div class="loading-track" aria-hidden="true"><span></span></div>
       <button class="ghost-button" id="cancelLoading" type="button">Cancel analysis</button>
@@ -146,7 +146,7 @@
     <section class="report hidden" id="report" aria-labelledby="reportTitle" tabindex="-1">
       <div class="report-toolbar">
         <div><div class="eyebrow"><span class="eyebrow-mark"></span>Fit brief</div><h2 id="reportTitle">Your decision</h2><p id="reportSubtitle">A clear view of your fit and the path forward.</p></div>
-        <div class="report-actions" aria-label="Report actions">
+        <div class="report-actions" role="group" aria-label="Report actions">
           <button class="secondary-button" id="editInputsBtn" type="button"><i data-lucide="pencil"></i><span>Edit inputs</span></button>
           <button class="secondary-button" id="copyBtn" type="button"><i data-lucide="copy"></i><span>Copy brief</span></button>
           <button class="secondary-button" id="jsonBtn" type="button"><i data-lucide="braces"></i><span class="action-wide">JSON</span></button>
@@ -192,21 +192,22 @@
           <article class="supplemental-card"><div class="report-card-title"><div><span class="mini-icon"><i data-lucide="scan-line"></i></span><h3>ATS readiness</h3></div><strong id="atsScore">—</strong></div><div class="meter"><span id="atsMeter"></span></div><p id="atsLabel">How well your resume performs with automated screening.</p><div class="compact-columns"><div><span class="mono-label">ISSUES</span><ul id="atsIssues" class="insight-list negative-list"></ul></div><div><span class="mono-label">SUGGESTIONS</span><ul id="atsSuggestions" class="insight-list"></ul></div></div></article>
         </div>
       </details>
-
-      <details class="history-card">
-        <summary><span><span class="mini-icon"><i data-lucide="clock-3"></i></span><strong>Saved on this device</strong></span><span class="history-summary-action">View history</span></summary>
-        <div class="history-card-body"><button id="clearHistory" class="text-action" type="button">Clear history</button><div id="historyList" class="history-list"><span class="empty">Your past analyses appear here.</span></div></div>
-      </details>
     </section>
+    <details class="history-card" id="history">
+      <summary><span><span class="mini-icon"><i data-lucide="clock-3"></i></span><strong>Saved on this device</strong></span><span class="history-summary-action" id="historySummaryAction">View history</span></summary>
+      <div class="history-card-body"><p class="history-notice" id="historyNotice">Saved in this browser only and deleted automatically 30 days after saving. Browser storage is not encrypted: anyone using this browser profile can read these reports. Delete one, or clear all, at any time.</p><button id="clearHistory" class="text-action" type="button">Clear history</button><div id="historyList" class="history-list"><span class="empty">No saved analyses yet.</span></div></div>
+    </details>
   </main>
 
   <dialog class="analysis-dialog" id="analysisDialog" aria-labelledby="dialogTitle">
     <div class="dialog-shell"><div class="dialog-header"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Analysis module</div><h2 id="dialogTitle">Evidence</h2><p id="dialogSubtitle">Focused details from your fit brief.</p></div><button class="dialog-close" id="dialogClose" aria-label="Close analysis module" type="button"><i data-lucide="x"></i></button></div><div class="dialog-content" id="dialogContent"></div></div>
   </dialog>
 
-  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+  <div class="toast hidden" id="toast" popover="manual" aria-hidden="true"></div>
+  <div class="sr-only" id="liveStatus" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="vendor/lucide.min.js"></script>
   <script src="resource-links.js"></script>
+  <script src="report-model.js"></script>
   <script src="client.js" defer></script>
 </body>
 </html>
