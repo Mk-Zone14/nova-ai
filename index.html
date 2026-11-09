@@ -204,7 +204,8 @@
     <div class="dialog-shell"><div class="dialog-header"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Analysis module</div><h2 id="dialogTitle">Evidence</h2><p id="dialogSubtitle">Focused details from your fit brief.</p></div><button class="dialog-close" id="dialogClose" aria-label="Close analysis module" type="button"><i data-lucide="x"></i></button></div><div class="dialog-content" id="dialogContent"></div></div>
   </dialog>
 
-  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+  <div class="toast hidden" id="toast" popover="manual" aria-hidden="true"></div>
+  <div class="sr-only" id="liveStatus" role="status" aria-live="polite" aria-atomic="true"></div>
   <script src="vendor/lucide.min.js"></script>
   <script src="resource-links.js"></script>
   <script src="report-model.js"></script>

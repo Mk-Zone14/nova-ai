@@ -47,13 +47,28 @@ function icons() {
   window.lucide?.createIcons();
 }
 
-function toast(message) {
+// Visible toast (top-layer popover so it also shows above the modal dialog) plus a persistent
+// live region: screen readers announce text changes in an always-rendered region far more
+// reliably than a node that toggles display:none.
+function announce(message) {
+  const region = $('#liveStatus');
+  if (!region) return;
+  region.textContent = '';
+  window.setTimeout(() => { region.textContent = message; }, 40);
+}
+function toast(message, duration = 2800) {
   const element = $('#toast');
+  announce(message);
   if (!element) return;
   element.textContent = message;
   element.classList.remove('hidden');
+  try { if (typeof element.showPopover === 'function' && !element.matches(':popover-open')) element.showPopover(); } catch { /* top layer unsupported: fixed positioning still applies */ }
   window.clearTimeout(element._toastTimer);
-  element._toastTimer = window.setTimeout(() => element.classList.add('hidden'), 2800);
+  element._toastTimer = window.setTimeout(() => {
+    try { if (typeof element.hidePopover === 'function' && element.matches(':popover-open')) element.hidePopover(); } catch { /* already hidden */ }
+    element.classList.add('hidden');
+    element.textContent = '';
+  }, duration);
 }
 
 function countTo(element, target, suffix = '', duration = 650) {
@@ -628,10 +643,11 @@ async function loadSection(section) {
     window.latestReport = latestReport;
     delete narrative.status[section];
     updateHistory(latestHistoryId, latestReport);
+    announce({ insights: 'Analysis details are ready.', coverLetter: 'Cover letter is ready.', interview: 'Interview preparation is ready.' }[section] || 'Section is ready.');
   } catch (error) {
     if (error.name === 'AbortError' || run !== narrative.runId) return;
     narrative.status[section] = 'error';
-    if (section !== 'insights') toast(friendlyError(error.message));
+    if (section !== 'insights') toast(friendlyError(error.message)); else announce('Analysis details could not be prepared. Open Strengths or Gaps to try again.');
   } finally {
     narrative.controllers.delete(controller);
     if (run === narrative.runId) refreshNarrativeUI();

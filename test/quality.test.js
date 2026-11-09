@@ -34,6 +34,17 @@ test('document retains critical accessibility landmarks and labels', () => {
   assert.match(html, /aria-pressed="false"/);
 });
 
+test('accessibility wiring: live region and top-layer toast', () => {
+  const html = read('index.html');
+  const client = read('client.js');
+  const css = read('styles.css');
+  assert.match(html, /<div class="sr-only" id="liveStatus" role="status" aria-live="polite"/, 'announcements need an always-rendered live region');
+  assert.match(html, /id="toast"[^>]*aria-hidden="true"/, 'the visual toast must not be announced twice');
+  assert.match(client, /function announce\(/);
+  assert.match(css, /\.toast\s*\{[^}]*position:\s*fixed/, 'toast must be positioned in the viewport, not left at the bottom of the page');
+  assert.match(css, /\.sr-only\s*\{/);
+});
+
 test('client has no new raw HTML sinks and loads the tested model before itself', () => {
   const client = read('client.js');
   // Escaping itself is tested behaviourally in report-model.test.js. Here we only guard the DOM
