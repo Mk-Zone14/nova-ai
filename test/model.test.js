@@ -53,6 +53,25 @@ test('GROQ_MODEL overrides the default model', async () => {
   assert.equal(model, 'some/other-model');
 });
 
+test('usage logging records latency, token counts and finish reason, and nothing sensitive', async () => {
+  process.env.GROQ_API_KEY = SECRET;
+  global.fetch = async () => reply(okBody('{"secretAnswer":"the model said this"}', { usage: { prompt_tokens: 120.4, completion_tokens: 45 } }))();
+  const logs = capture('info');
+  try { await call(); } finally { logs.restore(); }
+  const line = logs.lines.join('\n');
+  assert.match(line, /Groq call ok: model=openai\/gpt-oss-120b ms=\d+ prompt_tokens=120 completion_tokens=45 finish=stop/);
+  assert.doesNotMatch(line, new RegExp(`${SECRET}|SYSTEM PROMPT|profile text|secretAnswer|the model said`), 'prompts, completions and the key never reach the log');
+});
+
+test('usage logging tolerates missing or hostile usage fields', async () => {
+  process.env.GROQ_API_KEY = SECRET;
+  global.fetch = async () => reply({ choices: [{ message: { content: '{}' }, finish_reason: 'x\ny; DROP' }], usage: { prompt_tokens: 'many', completion_tokens: null } })();
+  const logs = capture('info');
+  try { await call(); } finally { logs.restore(); }
+  assert.match(logs.lines.join(''), /prompt_tokens=n\/a completion_tokens=n\/a finish=n\/a/);
+  assert.equal(logs.lines.length, 1);
+});
+
 test('provider failures keep their status even when the body is not JSON', async () => {
   process.env.GROQ_API_KEY = SECRET;
   for (const status of [401, 403, 429, 500, 502, 503]) {

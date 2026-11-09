@@ -185,8 +185,8 @@ npm run test
 Current test status:
 
 ```text
-107 tests
-107 passed
+144 tests
+144 passed
 0 failed
 ```
 
@@ -375,6 +375,29 @@ The time budgets are layered so the failure you see is always ours, not the plat
 | Browser timeout | 65 s (sections) / 75 s (analysis) |
 
 `test/quality.test.js` fails if these drift out of order. To confirm what a deployment actually applied, run `vercel inspect <deployment-url> --json` and read each function's `timeout`.
+
+### Verifying the real Groq integration
+
+The automated tests use a mocked provider, so they prove our handling of Groq's responses, not the model's behaviour. To check the real thing yourself:
+
+```bash
+GROQ_API_KEY=<your key> npm run verify:groq        # optional: GROQ_MODEL=<model id>
+```
+
+It runs the bundled sample profile and the Atlas Labs internship through the production handlers: two model calls for the verdict, then one call each for insights, cover letter and interview prep (five calls in total). It refuses to run without a key and never prints it. Each call also logs one line (`Groq call ok: model=… ms=… prompt_tokens=… completion_tokens=… finish=…`), so you can read real latency and token cost. The same line appears in the Vercel runtime logs in production (Hobby keeps logs for one hour).
+
+The script exits non-zero on any `FAIL`. What it checks, and what only you can judge:
+
+| Automatic | You must read it yourself |
+| --- | --- |
+| HTTP 200 per call and latency against the 50 s budget | Whether each requirement's status matches what the profile actually says (the table it prints) |
+| Verdict is a known value, 3+ requirements extracted | Whether the cover letter is honest and sounds like the student |
+| Every requirement quote exists in the opportunity text | Whether interview answers are specific rather than generic |
+| Every Matched/Partial evidence quote exists in the profile | Whether any learning-resource URL looks invented |
+| How many of the model's claims the code downgraded (a high count means overclaiming) | |
+| Cover letter length, `[placeholders]`, skills absent from the profile (heuristic) | |
+
+Things worth trying only after a baseline run, one at a time and re-running the script each time: a lower reasoning effort or a smaller `GROQ_MODEL` if latency is near the budget. Neither has been tested here.
 
 ---
 
