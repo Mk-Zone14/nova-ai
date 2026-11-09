@@ -257,13 +257,20 @@ test('maps malformed provider JSON and fetch errors to a safe gateway error', as
 test('rate limits repeated valid requests per client and returns retry guidance', async () => {
   process.env.GROQ_API_KEY = 'test-key';
   global.fetch = stagedFetch({ EXTRACT, MATCH, NARRATIVE });
-  const headers = { 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.10' };
+  const socket = { remoteAddress: '203.0.113.10' };
+  const headers = { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.1' };
   for (let index = 0; index < handler.limits.RATE_LIMIT_MAX_REQUESTS; index++) {
-    assert.equal((await run({ headers })).statusCode, 200);
+    assert.equal((await run({ headers, socket })).statusCode, 200);
   }
-  const limited = await run({ headers });
+  const limited = await run({ headers, socket });
   assert.equal(limited.statusCode, 429);
   assert.equal(limited.headers['Retry-After'], '60');
+  assert.equal(JSON.stringify(limited.body), JSON.stringify({ error: 'Too many analysis requests. Please wait a minute and try again.' }), 'generic message, no infrastructure details');
+  // rotating a forged forwarding header does not buy a fresh allowance
+  const forged = await run({ headers: { ...headers, 'x-forwarded-for': '198.51.100.2' }, socket });
+  assert.equal(forged.statusCode, 429);
+  // a genuinely different client is unaffected
+  assert.equal((await run({ headers, socket: { remoteAddress: '203.0.113.11' } })).statusCode, 200);
 });
 
 test('rate-limit and model-validation utilities cover expiry and invalid values', () => {

@@ -217,6 +217,15 @@ GROQ_API_KEY=your_groq_api_key
 
 Optional, recommended in production: set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (a free Upstash Redis database works) so the rate limit is shared across all serverless instances. Add the same variables to Vercel for Production and Preview.
 
+How the limiter identifies a client:
+
+* **On Vercel** it uses the platform-set `x-vercel-forwarded-for` header (falling back to `x-real-ip` / `x-forwarded-for`). This relies on Vercel's system environment variables being exposed to functions (the project default), because the limiter checks the `VERCEL` variable to decide whether to trust those headers.
+* **Everywhere else** (local dev, other hosts) forwarding headers are **ignored** and the socket address is used, because otherwise a caller could send a new `X-Forwarded-For` on every request and never be limited. Behind your own reverse proxy that means all clients share the proxy's address.
+* IPv6 clients are grouped by /64 prefix; invalid addresses are discarded. With no usable address at all, clients are separated by a hash of the user-agent and language headers instead of sharing one bucket.
+* Limits: 10 analyses and 20 narrative sections per client per minute (fixed window, so a short burst across a window boundary can briefly reach double). Rate-limit responses are a generic message plus `Retry-After`.
+* If Redis is unreachable the limiter fails **open** to the per-instance fallback (so an outage cannot take Nova down), logs the error type once a minute, and the fallback is weaker. Without the two variables on Vercel it logs a one-time warning that limiting is per-instance only.
+* `UPSTASH_REDIS_REST_URL` must be `https://`; plain `http://` is accepted only for a loopback emulator.
+
 ### 4. Start the development server
 
 ```bash

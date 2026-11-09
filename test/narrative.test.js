@@ -197,11 +197,12 @@ test('maps upstream auth failures, timeouts and network errors without leaking d
 
 test('has its own, higher rate-limit bucket that does not consume the analyze allowance', async () => {
   global.fetch = model({ strengths: ['x'] });
-  const headers = { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.7' };
-  for (let index = 0; index < 20; index++) assert.equal((await run(base({ headers }))).statusCode, 200, `request ${index + 1}`);
-  const limited = await run(base({ headers }));
+  const headers = { 'content-type': 'application/json' };
+  const socket = { remoteAddress: '198.51.100.7' };
+  for (let index = 0; index < 20; index++) assert.equal((await run({ ...base({ headers }), socket })).statusCode, 200, `request ${index + 1}`);
+  const limited = await run({ ...base({ headers }), socket });
   assert.equal(limited.statusCode, 429);
   assert.equal(limited.headers['Retry-After'], '60');
   // the same client can still run analyses
-  assert.equal(await rateLimit.isRateLimited(rateLimit.getClientKey({ headers })), false);
+  assert.equal(await rateLimit.isRateLimited(rateLimit.getClientKey({ headers, socket })), false);
 });
