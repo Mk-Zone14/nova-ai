@@ -381,6 +381,70 @@
     ].join('\n');
   }
 
+  // ---- saved history (localStorage) -----------------------------------------------------------
+  // A saved report holds personal details (profile quotes, generated drafts), so entries expire. Policy: kept for
+  // HISTORY_TTL_DAYS from the first save (editing an entry never extends it), at most HISTORY_MAX entries, and every
+  // read of the store goes through normalizeHistory(), so expired, malformed and legacy entries are dealt with in one place.
+  const HISTORY_KEY = 'ocopilot-history';
+  const HISTORY_TTL_DAYS = 30;
+  const HISTORY_TTL_MS = HISTORY_TTL_DAYS * 24 * 60 * 60 * 1000;
+  const HISTORY_MAX = 10;
+  const HISTORY_EARLIEST = Date.UTC(2020, 0, 1); // legacy ids are Date.now() values; smaller numbers are not timestamps
+  const HISTORY_CLOCK_SKEW_MS = 24 * 60 * 60 * 1000;
+  const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const plausibleTime = (value, now) => typeof value === 'number' && Number.isFinite(value) && value >= HISTORY_EARLIEST && value <= now + HISTORY_CLOCK_SKEW_MS;
+
+  // Returns a clean entry, or null if it is malformed or expired. Migration policy for legacy entries (saved before
+  // expiry existed, so without savedAt/expiresAt): their id WAS Date.now() at save time, so the real save time is
+  // recovered from it and they expire HISTORY_TTL_DAYS after that (older ones are therefore removed on first load).
+  // If the id is not a plausible timestamp the entry is kept and given a full term from now. An expiresAt that would
+  // outlive the policy is clamped to it, so edited storage cannot extend retention.
+  function normalizeHistoryEntry(entry, now) {
+    if (!isPlainObject(entry) || !isPlainObject(entry.report)) return null;
+    const id = typeof entry.id === 'number' && Number.isFinite(entry.id) ? entry.id : (typeof entry.id === 'string' && entry.id ? entry.id : null);
+    if (id === null) return null;
+    const savedAt = plausibleTime(entry.savedAt, now) ? entry.savedAt : (plausibleTime(id, now) ? id : now);
+    const limit = savedAt + HISTORY_TTL_MS;
+    const expiresAt = typeof entry.expiresAt === 'number' && Number.isFinite(entry.expiresAt) ? Math.min(entry.expiresAt, limit) : limit;
+    if (expiresAt <= now) return null;
+    return {
+      id,
+      title: typeof entry.title === 'string' && entry.title.trim() ? entry.title.slice(0, 200) : 'Analysis',
+      score: typeof entry.score === 'number' && Number.isFinite(entry.score) ? entry.score : null,
+      verdict: typeof entry.verdict === 'string' ? entry.verdict.slice(0, 100) : '',
+      timestamp: typeof entry.timestamp === 'string' ? entry.timestamp.slice(0, 100) : '',
+      savedAt,
+      expiresAt,
+      report: entry.report
+    };
+  }
+
+  // raw: the stored string (or null). Returns the entries to keep plus whether storage must be rewritten (something
+  // expired, was malformed or was migrated). Unreadable storage yields no entries and changed: true.
+  function normalizeHistory(raw, now = Date.now()) {
+    if (raw === null || raw === undefined) return { entries: [], changed: false };
+    let parsed = null;
+    if (typeof raw === 'string') { try { parsed = JSON.parse(raw); } catch { parsed = null; } }
+    const seen = new Set();
+    const entries = [];
+    for (const item of Array.isArray(parsed) ? parsed : []) {
+      const entry = normalizeHistoryEntry(item, now);
+      if (!entry || seen.has(entry.id)) continue;
+      seen.add(entry.id);
+      entries.push(entry);
+      if (entries.length === HISTORY_MAX) break;
+    }
+    return { entries, changed: JSON.stringify(entries) !== raw };
+  }
+  // entries come from normalizeHistory. The new entry is stamped here so every saved entry carries its own expiry.
+  function addHistoryEntry(entries, entry, now = Date.now()) {
+    const stamped = { ...entry, savedAt: now, expiresAt: now + HISTORY_TTL_MS };
+    return [stamped, ...entries.filter((item) => item.id !== entry.id)].slice(0, HISTORY_MAX);
+  }
+  function removeHistoryEntry(entries, id) {
+    return entries.filter((item) => String(item.id) !== String(id));
+  }
+
   // ---- export ---------------------------------------------------------------------------------
   // html2canvas (inside html2pdf) cannot parse CSS Color 4 functions. Chrome reports computed color-mix()
   // values as color(srgb ...), so the export converts them in its private clone of the report.
@@ -424,7 +488,8 @@
     statusCounts, firstText, biggestConcern, nextBestAction, contextCandidate,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
-    hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage
+    hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,
+    HISTORY_KEY, HISTORY_TTL_DAYS, HISTORY_TTL_MS, HISTORY_MAX, normalizeHistory, addHistoryEntry, removeHistoryEntry
   };
   root.NovaReport = api;
   if (typeof module === 'object' && module.exports) module.exports = api;

@@ -161,6 +161,8 @@ Nova AI is designed with security in mind.
 * External links use `noopener noreferrer`.
 * Security headers are configured through Vercel.
 * User-facing analysis does not expose the underlying API key.
+* **Untrusted text never shares a channel with instructions.** Your profile, the opportunity text, requirement text and the verified assessment are sent to the model as a single JSON object in the `user` message; the `system` message holds only fixed instructions that say that object is data, not commands. JSON encoding escapes quotes, backslashes and newlines, so pasted text cannot close a delimiter or add fields (there are no in-band tags to break out of). This is a boundary, not a guarantee that a model can never be persuaded by wording inside the data: the guarantees that matter are enforced in code (evidence quotes must exist verbatim in your text, the verdict and statuses are computed in code, and responses are schema-filtered). See `lib/prompts.js` and `test/prompt-injection.test.js`.
+* **Saved history is retention-limited.** Your last 10 reports are kept in this browser's `localStorage` (key `ocopilot-history`) and nowhere else. Each entry gets a save time and an expiry **30 days later**; expired, malformed and unreadable entries are deleted when the page loads and again before anything is displayed or restored. You can delete one entry or clear everything at any time. Entries saved by earlier versions (no expiry field) are migrated on first load: the save time is recovered from the entry id, so one older than 30 days is deleted, and any other gets the remainder of its 30 days (an id that is not a plausible timestamp gets a full 30 days from migration). `localStorage` is **not encrypted** and is readable by anyone who can use this browser profile or by script on this origin; Nova states this in the interface. There is currently no history export. Stored reports include the evidence quotes and drafted text from your inputs, so treat them as personal data. The history panel ("Saved on this device") sits below the workspace and the report, so saved analyses can be reopened or deleted straight after a reload without running a new analysis.
 
 The production API key is stored as a sensitive Vercel environment variable and is never committed to this repository.
 
@@ -185,15 +187,15 @@ npm run test
 Current test status:
 
 ```text
-144 tests
-144 passed
+210 tests
+210 passed
 0 failed
 ```
 
 ### Real-browser PDF export tests
 
-`npm test` runs only the Node unit tests (the 144 above) and does **not** start a browser. The PDF export is
-additionally covered by a separate suite in `test-browser/` that drives real Chromium against the real, vendored
+`npm test` runs only the Node unit tests (the 210 above) and does **not** start a browser. The PDF export is
+additionally covered by a separate suite in `test-browser/` (PDF export plus saved-history retention) that drives real Chromium against the real, vendored
 html2pdf.js (the library is never stubbed; only the `/api/*` calls are mocked, and failures are injected into the
 browser's canvas APIs). Run it separately:
 

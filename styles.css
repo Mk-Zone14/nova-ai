@@ -280,12 +280,20 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .history-card { margin-top: 10px; }
 .history-summary-action { color: var(--muted); font-size: 11px; }
 .history-card-body { padding: 0 0 19px; }
+.history-card-body [hidden] { display: none; }
 .history-list { display: grid; gap: 6px; padding-top: 13px; }
 .history-list button { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 10px 0; color: var(--ink); text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--line); }
 .history-list button:last-child { border-bottom: 0; }
 .history-list button:hover strong { color: var(--accent-strong); }
 .history-list strong, .history-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .history-list strong { font-size: 13px; }
+.history-item { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); }
+.history-item:last-child { border-bottom: 0; }
+.history-item > button[data-history] { flex: 1; min-width: 0; border-bottom: 0; }
+.history-item .history-remove { flex: none; justify-content: center; width: 64px; padding: 0; color: var(--muted); border: 0; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer; }
+.history-item .history-remove:hover, .history-item .history-remove:focus-visible { color: var(--ink); background: var(--accent-soft); }
+.history-notice { margin: 13px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+@media (max-width: 680px) { .history-item > button[data-history] { flex-direction: column; align-items: flex-start; gap: 2px; } .history-item > button[data-history] > * { max-width: 100%; } }
 .history-list span { color: var(--muted); font-size: 12px; }
 .empty { color: var(--faint); font-size: 13px; }
 .narrative-pending { color: var(--muted); font-size: 13px; animation: narrative-pulse 1.6s ease-in-out infinite; }

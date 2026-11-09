@@ -11,7 +11,8 @@ const {
   safe, arr, notAvailable, numberOrNull, adaptNovaReport, friendlyError, list, presentationText,
   humanizeVerdict, statusCounts, biggestConcern, nextBestAction, contextCandidate, moduleContent,
   buildAssessmentPayload, mergeNarrative, hasInsights,
-  hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage
+  hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,
+  HISTORY_KEY, normalizeHistory, addHistoryEntry, removeHistoryEntry
 } = window.NovaReport;
 const storage = {
   get(key) {
@@ -578,35 +579,52 @@ dialog?.addEventListener('cancel', closeDialog);
 function renderHistory() {
   const element = $('#historyList');
   if (!element) return;
-  const entries = historyEntries();
-  element.innerHTML = entries.length ? entries.map((entry) => `<button data-history="${safe(entry.id)}" aria-label="Restore analysis: ${safe(entry.title)}, score ${safe(entry.score ?? 'Not available')}"><strong>${safe(entry.title)}</strong><span>${safe(entry.score == null ? 'Not available' : `${entry.score}/100`)} · ${safe(humanizeVerdict(entry.verdict || 'Analysis'))} · ${safe(entry.timestamp || 'Saved')}</span></button>`).join('') : '<span class="empty">Your past analyses appear here.</span>';
+  const entries = historyEntries(); // prunes expired and malformed entries before anything is shown
+  element.innerHTML = entries.length ? entries.map((entry) => `<div class="history-item"><button data-history="${safe(entry.id)}" aria-label="Restore analysis: ${safe(entry.title)}, score ${safe(entry.score ?? 'Not available')}"><strong>${safe(entry.title)}</strong><span>${safe(entry.score == null ? 'Not available' : `${entry.score}/100`)} · ${safe(humanizeVerdict(entry.verdict || 'Analysis'))} · ${safe(entry.timestamp || 'Saved')}</span></button><button class="history-remove" data-history-remove="${safe(entry.id)}" aria-label="Delete saved analysis: ${safe(entry.title)}">Delete</button></div>`).join('') : '<span class="empty">No saved analyses yet.</span>';
+  const action = $('#historySummaryAction');
+  if (action) action.textContent = entries.length ? `${entries.length} saved` : 'None yet';
+  const clear = $('#clearHistory');
+  if (clear) clear.hidden = !entries.length;
   $$('[data-history]').forEach((button) => button.addEventListener('click', () => {
+    if (abortController) { toast('An analysis is running. Cancel it or wait for it to finish first.'); return; }
     const entry = historyEntries().find((item) => String(item.id) === String(button.dataset.history));
-    if (entry?.report) renderReport(entry.report, { save: false });
+    if (!entry) { renderHistory(); toast('That saved analysis has expired or was removed.'); return; }
+    renderReport(entry.report, { save: false });
+    $('#report')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
+  $$('[data-history-remove]').forEach((button) => button.addEventListener('click', () => {
+    writeHistory(removeHistoryEntry(historyEntries(), button.dataset.historyRemove));
+    renderHistory();
+    toast('Saved analysis deleted from this device.');
   }));
 }
+// The only reader of the history store. Expired, malformed and legacy entries are removed or migrated here, so display,
+// restore and update can never see them (see normalizeHistory in report-model.js for the policy).
 function historyEntries() {
-  try {
-    const parsed = JSON.parse(storage.get('ocopilot-history') || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
+  const { entries, changed } = normalizeHistory(storage.get(HISTORY_KEY), Date.now());
+  if (changed) writeHistory(entries);
+  return entries;
+}
+function writeHistory(entries) {
+  if (entries.length) storage.set(HISTORY_KEY, JSON.stringify(entries));
+  else storage.remove(HISTORY_KEY);
 }
 function saveHistory(report) {
-  const existing = historyEntries();
   const title = report?.opportunitySummary?.role || report?.opportunityName || 'Analysis';
   const entry = { id: Date.now(), title, score: numberOrNull(report?.overallMatchScore), verdict: humanizeVerdict(report?.eligibilityVerdict || 'Analysis'), timestamp: new Date().toLocaleString(), report };
-  storage.set('ocopilot-history', JSON.stringify([entry, ...existing].slice(0, 10)));
+  writeHistory(addHistoryEntry(historyEntries(), entry, entry.id));
   return entry.id;
 }
 function updateHistory(id, report) {
   if (id == null) return;
   const entries = historyEntries();
   const index = entries.findIndex((item) => item.id === id);
-  if (index === -1) return;
+  if (index === -1) return; // deleted or expired meanwhile: never resurrect it
+  // Spread keeps savedAt/expiresAt: editing an entry does not extend how long it is kept.
   entries[index] = { ...entries[index], score: numberOrNull(report?.overallMatchScore), report };
-  storage.set('ocopilot-history', JSON.stringify(entries));
+  writeHistory(entries);
 }
-$('#clearHistory')?.addEventListener('click', () => { storage.remove('ocopilot-history'); renderHistory(); toast('History cleared from this device.'); });
+$('#clearHistory')?.addEventListener('click', () => { storage.remove(HISTORY_KEY); renderHistory(); toast('History cleared from this device.'); });
 
 // ---- on-demand sections ----------------------------------------------------------------------
 function resetNarrative(inputs) {
