@@ -8,7 +8,8 @@ const {
   safe, arr, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError, list, presentationText, normalizeStatus,
   humanizeVerdict, requirementItems, statusCounts, biggestConcern, nextBestAction, contextCandidate,
   detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
-  buildAssessmentPayload, mergeNarrative, hasInsights
+  buildAssessmentPayload, mergeNarrative, hasInsights,
+  responseErrorMessage
 } = model;
 
 const MODULES = ['requirements', 'strengths', 'gaps', 'documents', 'risks', 'strategy', 'resources'];
@@ -400,4 +401,33 @@ test('hasInsights recognises generated sections, legacy reports, and a verdict-o
   const verdictOnly = adaptNovaReport({ eligibilityVerdict: 'Eligible' });
   assert.equal(hasInsights(mergeNarrative(verdictOnly, {}, 'insights')), true, 'an insights section that legitimately found nothing is still generated');
   assert.equal(hasInsights(mergeNarrative(verdictOnly, { coverLetter: 'x' }, 'coverLetter')), false);
+});
+
+test('responseErrorMessage prefers our own safe message and otherwise describes the status', () => {
+  assert.equal(responseErrorMessage(429, '{"error":"Too many analysis requests. Please wait a minute and try again."}'), 'Too many analysis requests. Please wait a minute and try again.');
+  assert.equal(responseErrorMessage(400, JSON.stringify({ error: '  padded  ' })), 'padded');
+  assert.equal(responseErrorMessage(502, JSON.stringify({ error: 'x'.repeat(1000) })).length, 300, 'capped');
+  // platform pages and proxies do not speak JSON
+  assert.match(responseErrorMessage(504, '<html>An error occurred with your deployment FUNCTION_INVOCATION_TIMEOUT</html>'), /took too long/);
+  assert.match(responseErrorMessage(408, ''), /took too long/);
+  assert.match(responseErrorMessage(429, 'Too Many Requests'), /Too many requests/);
+  assert.match(responseErrorMessage(413, 'Payload Too Large'), /too large/);
+  assert.match(responseErrorMessage(500, 'Internal Server Error'), /problem on its side/);
+  assert.match(responseErrorMessage(503, undefined), /problem on its side/);
+  assert.match(responseErrorMessage(404, 'nope'), /could not be completed/);
+  for (const odd of ['{"error":42}', '{"error":""}', '{"error":null}', '[]', 'null', '{"message":"x"}']) {
+    assert.match(responseErrorMessage(502, odd), /problem on its side/, odd);
+  }
+  assert.doesNotMatch(responseErrorMessage(500, '<html>stack at /var/task/index.js</html>'), /var\/task|html/i, 'raw bodies are never echoed');
+});
+
+test('friendlyError describes network failures and keeps hiding provider and configuration details', () => {
+  for (const raw of ['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed', 'network request failed']) {
+    assert.match(friendlyError(raw), /Could not reach Nova/, raw);
+  }
+  assert.match(friendlyError('Add GROQ_API_KEY to Vercel Environment Variables'), /unavailable/);
+  assert.match(friendlyError('Invalid API key provided'), /unavailable/);
+  assert.equal(friendlyError('Analysis is temporarily unavailable. Please try again later.'), 'Analysis is temporarily unavailable. Please try again later.', 'our own generic messages pass through');
+  assert.equal(friendlyError('Nova could not complete the analysis. Please try again.'), 'Nova could not complete the analysis. Please try again.');
+  assert.equal(friendlyError("Nova's AI service is busy right now. Please try again in a minute."), "Nova's AI service is busy right now. Please try again in a minute.");
 });

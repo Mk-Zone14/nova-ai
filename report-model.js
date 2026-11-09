@@ -85,10 +85,24 @@
   }
   function friendlyError(message) {
     const raw = String(message || '');
-    if (/Groq|GROQ_API_KEY|server is not configured|not configured for AI analysis|STAGE|provider|invalid analysis/i.test(raw)) return 'Analysis is unavailable in this preview right now. Your inputs are still here—please try again later.';
+    if (/Groq|GROQ_API_KEY|API key|Environment Variables|server is not configured|not configured for AI analysis|STAGE|provider|invalid analysis/i.test(raw)) return 'Analysis is unavailable in this preview right now. Your inputs are still here—please try again later.';
+    if (/failed to fetch|networkerror|network request failed|load failed/i.test(raw)) return 'Could not reach Nova. Check your connection and try again. Your inputs are still here.';
     if (/timed out/i.test(raw)) return 'The analysis took too long to finish. Your inputs are still here—please try again.';
     if (/too many/i.test(raw)) return raw;
     return raw || 'Something went wrong. Your inputs are still here—please try again.';
+  }
+  // Message for a failed HTTP response. Our API always sends { error: "<safe message>" }; anything else (a platform
+  // timeout page, a proxy error) is described from the status code instead of surfacing "unreadable response".
+  function responseErrorMessage(status, bodyText) {
+    try {
+      const parsed = JSON.parse(bodyText);
+      if (parsed && typeof parsed.error === 'string' && parsed.error.trim()) return parsed.error.trim().slice(0, 300);
+    } catch { /* not JSON: describe by status below */ }
+    if (status === 429) return 'Too many requests. Please wait a minute and try again.';
+    if (status === 408 || status === 504) return 'The request took too long to finish. Please try again.';
+    if (status === 413) return 'That request was too large. Shorten your text and try again.';
+    if (status >= 500) return 'Nova hit a problem on its side. Please try again in a moment.';
+    return 'The request could not be completed. Please try again.';
   }
   function list(items, emptyText = 'No details identified.') {
     const values = arr(items).filter(Boolean);
@@ -372,7 +386,8 @@
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
     statusCounts, firstText, biggestConcern, nextBestAction, contextCandidate,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
-    buildAssessmentPayload, mergeNarrative, hasInsights
+    buildAssessmentPayload, mergeNarrative, hasInsights,
+    responseErrorMessage
   };
   root.NovaReport = api;
   if (typeof module === 'object' && module.exports) module.exports = api;

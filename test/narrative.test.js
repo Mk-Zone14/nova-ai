@@ -182,9 +182,12 @@ test('treats model output that is empty or unusable for the section as a gateway
 
 test('maps upstream auth failures, timeouts and network errors without leaking details', async () => {
   global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'key test-key' } }) });
-  const auth = await run();
-  assert.equal(auth.statusCode, 401);
-  assert.doesNotMatch(JSON.stringify(auth.body), /test-key/);
+  const original = console.error;
+  console.error = () => {};
+  let auth;
+  try { auth = await run(); } finally { console.error = original; }
+  assert.equal(auth.statusCode, 503, 'a rejected provider key is our problem, not an authorisation failure for the visitor');
+  assert.doesNotMatch(JSON.stringify(auth.body), /test-key|GROQ|Vercel|environment/i);
   global.fetch = async () => { const error = new Error('aborted'); error.name = 'AbortError'; throw error; };
   assert.equal((await run()).statusCode, 504);
   global.fetch = async () => { throw new Error('network unavailable'); };

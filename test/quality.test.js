@@ -138,3 +138,15 @@ test('only the insights section loads automatically; drafts are never requested 
   const vercel = JSON.parse(fs.readFileSync(path.join(root, 'vercel.json'), 'utf8'));
   assert.ok(vercel.functions['api/narrative.js'], 'narrative function needs its own maxDuration');
 });
+
+test('client error handling: one request helper, bounded timeouts, no duplicate runs, no swallowed errors', () => {
+  const client = read('client.js');
+  assert.equal([...client.matchAll(/\bfetch\(/g)].length, 1, 'all network calls must go through postJson');
+  assert.match(client, /ANALYZE_TIMEOUT_MS\s*=\s*75_000/);
+  assert.match(client, /SECTION_TIMEOUT_MS\s*=\s*65_000/);
+  assert.match(client, /if \(abortController\) return;/, 'a second analysis must not start while one is running');
+  assert.doesNotMatch(client, /catch\s*(\([^)]*\))?\s*\{\s*\}/, 'empty catch blocks swallow errors');
+  assert.doesNotMatch(client, /console\.error\([^)]*,\s*(error|err|e)\s*\)/, 'log error names/messages, never whole error objects (may carry payloads)');
+  assert.doesNotMatch(client, /alert\(|\.stack\b/, 'no alert() and no stack traces in the UI');
+  assert.match(client, /copyText\(/, 'clipboard access goes through the guarded helper');
+});

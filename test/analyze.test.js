@@ -87,9 +87,16 @@ test('rejects methods other than POST and declares the allowed method', async ()
 test('does not call the provider when its secret is missing', async () => {
   delete process.env.GROQ_API_KEY;
   global.fetch = async () => { throw new Error('must not call provider'); };
-  const res = await run();
+  const logs = [];
+  const original = console.error;
+  console.error = (...args) => logs.push(args.map(String).join(' '));
+  let res;
+  try { res = await run(); } finally { console.error = original; }
   assert.equal(res.statusCode, 503);
-  assert.match(res.body.error, /not configured/);
+  assert.deepEqual(Object.keys(res.body), ['error']);
+  assert.match(res.body.error, /temporarily unavailable/i);
+  assert.doesNotMatch(JSON.stringify(res.body), /GROQ|Vercel|API key|environment|redeploy/i, 'visitors are not told how the server is configured');
+  assert.match(logs.join('\n'), /GROQ_API_KEY is not set/, 'the operator is told, in the log');
 });
 
 test('rejects non-JSON requests', async () => {
@@ -136,12 +143,52 @@ test('enforces the opportunity size limit before calling the provider', async ()
   assert.equal(res.statusCode, 400);
 });
 
-test('returns a generic authentication error without exposing the secret', async () => {
+test('upstream authentication failures become a generic 503: no secret, no config advice, details only in the log', async () => {
   process.env.GROQ_API_KEY = 'private-test-key';
   global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'key private-test-key' } }) });
-  const res = await run();
-  assert.equal(res.statusCode, 401);
-  assert.doesNotMatch(JSON.stringify(res.body), /private-test-key/);
+  const logs = [];
+  const original = console.error;
+  console.error = (...args) => logs.push(args.map(String).join(' '));
+  let res;
+  try { res = await run(); } finally { console.error = original; }
+  assert.equal(res.statusCode, 503, 'not 401: the visitor did nothing wrong');
+  assert.deepEqual(Object.keys(res.body), ['error']);
+  assert.doesNotMatch(JSON.stringify(res.body), /private-test-key|GROQ|Vercel|environment/i);
+  assert.match(logs.join('\n'), /upstream status 401/);
+  assert.match(logs.join('\n'), /Check GROQ_API_KEY/);
+  assert.doesNotMatch(logs.join('\n'), /private-test-key/, 'the key never reaches the log');
+});
+
+test('a provider rate limit is reported as "busy, try again" with Retry-After, not as an opaque failure', async () => {
+  process.env.GROQ_API_KEY = 'test-key';
+  global.fetch = async () => ({ ok: false, status: 429, json: async () => ({ error: { message: 'rate limit for org-secret-123' } }) });
+  const original = console.error;
+  console.error = () => {};
+  let res;
+  try { res = await run(); } finally { console.error = original; }
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.headers['Retry-After'], '30');
+  assert.match(res.body.error, /busy/i);
+  assert.doesNotMatch(JSON.stringify(res.body), /org-secret-123|Groq/);
+});
+
+test('error responses contain only a safe message: no stack traces, provider text or internals', async () => {
+  process.env.GROQ_API_KEY = 'test-key';
+  const original = console.error;
+  console.error = () => {};
+  try {
+    for (const failure of [
+      async () => ({ ok: false, status: 500, json: async () => ({ error: { message: 'stack at /var/task/node_modules/x.js:1:1' } }) }),
+      async () => { throw new TypeError('fetch failed: connect ECONNREFUSED 10.1.2.3:443'); },
+      async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'not json {' } }] }) })
+    ]) {
+      global.fetch = failure;
+      const res = await run();
+      assert.ok(res.statusCode >= 500, String(res.statusCode));
+      assert.deepEqual(Object.keys(res.body), ['error']);
+      assert.doesNotMatch(JSON.stringify(res.body), /stack|\/var\/task|node_modules|ECONNREFUSED|10\.1\.2\.3|TypeError|Groq/i);
+    }
+  } finally { console.error = original; }
 });
 
 test('maps non-authentication provider failures to a generic gateway error', async () => {

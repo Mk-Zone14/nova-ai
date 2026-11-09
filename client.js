@@ -10,7 +10,8 @@ const $$ = (selector) => document.querySelectorAll(selector);
 const {
   safe, arr, notAvailable, numberOrNull, adaptNovaReport, friendlyError, list, presentationText,
   humanizeVerdict, statusCounts, biggestConcern, nextBestAction, contextCandidate, moduleContent,
-  buildAssessmentPayload, mergeNarrative, hasInsights
+  buildAssessmentPayload, mergeNarrative, hasInsights,
+  responseErrorMessage
 } = window.NovaReport;
 const storage = {
   get(key) {
@@ -23,6 +24,58 @@ const storage = {
     try { window.localStorage.removeItem(key); } catch { /* Storage can be disabled. */ }
   }
 };
+
+// Longer than the server's own limits (60 s per function), so a healthy request is never cut off by the browser,
+// but a stalled connection can never leave the interface waiting forever.
+const ANALYZE_TIMEOUT_MS = 75_000;
+const SECTION_TIMEOUT_MS = 65_000;
+
+// Errors whose message is written for the user. Anything else (a bug, a library error) is logged by name and shown generically.
+class UserFacingError extends Error {}
+const GENERIC_FAILURE = 'Something went wrong. Your inputs are still here—please try again.';
+function userMessage(error) {
+  return error instanceof UserFacingError ? friendlyError(error.message) : GENERIC_FAILURE;
+}
+
+// POSTs JSON and returns the parsed body. A user cancel rejects with the original AbortError (callers ignore it);
+// a timeout, network failure or error response rejects with a UserFacingError.
+async function postJson(url, payload, { signal, timeoutMs }) {
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  const forwardAbort = () => controller.abort();
+  if (signal?.aborted) controller.abort();
+  signal?.addEventListener('abort', forwardAbort, { once: true });
+  try {
+    let response;
+    try {
+      response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: controller.signal });
+    } catch (error) {
+      if (timedOut) throw new UserFacingError('The request took too long to finish. Please try again.');
+      if (error?.name === 'AbortError') throw error;
+      throw new UserFacingError('Could not reach Nova. Check your connection and try again. Your inputs are still here.');
+    }
+    let text;
+    try {
+      text = await response.text();
+    } catch (error) {
+      if (timedOut) throw new UserFacingError('The request took too long to finish. Please try again.');
+      if (error?.name === 'AbortError') throw error;
+      throw new UserFacingError('The connection dropped before Nova finished. Please try again.');
+    }
+    if (!response.ok) throw new UserFacingError(responseErrorMessage(response.status, text));
+    try { return JSON.parse(text); } catch { throw new UserFacingError('Nova received an unreadable response. Please try again.'); }
+  } finally {
+    window.clearTimeout(timer);
+    signal?.removeEventListener('abort', forwardAbort);
+  }
+}
+
+// Clipboard writes can be unavailable (insecure context, denied permission); say so instead of doing nothing.
+function copyText(text, success, failure) {
+  if (!navigator.clipboard?.writeText) { toast(failure); return; }
+  navigator.clipboard.writeText(text).then(() => toast(success), () => toast(failure));
+}
 
 const samples = {
   profile: `Priya Sharma is a 20-year-old third-year B.Tech Computer Science student at Delhi Technological University, graduating May 2027. CGPA: 8.6/10. Indian citizen. Skills: JavaScript, TypeScript, React, Python, SQL, Git, Figma. Completed a 3-month frontend engineering internship at a fintech startup and shipped React components used by 10,000+ users. Led a team of four at a university hackathon; placed second. Volunteers teaching digital literacy. Available 15 hours per week.`,
@@ -302,7 +355,7 @@ async function extractTextFromPDF(file) {
     const arrayBuffer = await file.arrayBuffer();
     const pdfjsLib = window['pdfjs-dist/build/pdf'] || window.pdfjsLib;
     if (!pdfjsLib) {
-      toast('PDF reader is loading. Please try again in a moment.');
+      toast('The PDF reader is not available in this browser session. Paste your resume text instead.');
       return null;
     }
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js';
@@ -319,8 +372,11 @@ async function extractTextFromPDF(file) {
     }
     return text.trim();
   } catch (error) {
-    console.error('PDF extraction error:', error);
-    toast('Could not read this PDF. Try a text-based PDF or paste your resume directly.');
+    // Name only: the error object can carry document details, and a resume is personal data.
+    console.error('PDF extraction failed:', error?.name || 'UnknownError');
+    toast(error?.name === 'PasswordException'
+      ? 'This PDF is password-protected. Remove the password or paste your resume text instead.'
+      : 'Could not read this PDF. Try a text-based PDF or paste your resume directly.');
     return null;
   }
 }
@@ -411,6 +467,7 @@ function stopLoading() {
 }
 
 async function runAnalysis() {
+  if (abortController) return; // an analysis is already running: never start a duplicate request
   const profile = profileInput.value.trim();
   const opportunity = opportunityInput.value.trim();
   if (!profile || !opportunity) { toast('Add both your profile and an opportunity first.'); return; }
@@ -424,22 +481,15 @@ async function runAnalysis() {
   startLoading();
   abortController = new AbortController();
   try {
-    const response = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile, opportunity }),
-      signal: abortController.signal
-    });
-    let data = {};
-    try { data = await response.json(); } catch { throw new Error('The analysis response was not readable.'); }
-    if (!response.ok) throw new Error(data.error || 'The analysis could not be completed.');
-    if (!data.response) throw new Error('The analysis returned no result.');
+    const data = await postJson('/api/analyze', { profile, opportunity }, { signal: abortController.signal, timeoutMs: ANALYZE_TIMEOUT_MS });
+    if (!data?.response) throw new UserFacingError('The analysis returned no result. Please try again.');
     renderReport(adaptNovaReport(data), { save: true, inputs: { profile, opportunity } });
   } catch (error) {
-    if (error.name === 'AbortError') return;
-    const message = friendlyError(error.message);
+    if (error?.name === 'AbortError') return;
+    // Log the kind of failure only (never request content), then show a message the user can act on.
+    if (!(error instanceof UserFacingError)) console.error('Analysis failed unexpectedly:', error?.name || 'UnknownError');
     const errorMessage = $('#errorMessage');
-    if (errorMessage) errorMessage.textContent = message;
+    if (errorMessage) errorMessage.textContent = userMessage(error);
     document.body.classList.remove('analysis-mode');
     $('#errorCard')?.classList.remove('hidden');
     window.requestAnimationFrame(() => $('#errorTitle')?.focus({ preventScroll: true }));
@@ -492,7 +542,7 @@ $('#dialogContent')?.addEventListener('click', (event) => {
   if (!target) return;
   if (target.id === 'coverLetterCopy') {
     const text = latestReport?.coverLetter || '';
-    navigator.clipboard?.writeText(text).then(() => toast('Cover letter copied.'), () => toast('Could not copy the cover letter.'));
+    copyText(text, 'Cover letter copied.', 'Could not copy the cover letter.');
     return;
   }
   const section = { 'generate-cover-letter': 'coverLetter', 'generate-interview': 'interview', 'retry-insights': 'insights' }[target.dataset.action];
@@ -628,26 +678,20 @@ async function loadSection(section) {
   narrative.status[section] = 'loading';
   refreshNarrativeUI();
   try {
-    const response = await fetch('/api/narrative', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...narrative.inputs, section, assessment: buildAssessmentPayload(latestReport) }),
-      signal: controller.signal
-    });
-    let body = {};
-    try { body = await response.json(); } catch { throw new Error('The response was not readable.'); }
-    if (!response.ok) throw new Error(body.error || 'This section could not be generated.');
+    const body = await postJson('/api/narrative', { ...narrative.inputs, section, assessment: buildAssessmentPayload(latestReport) }, { signal: controller.signal, timeoutMs: SECTION_TIMEOUT_MS });
     if (run !== narrative.runId) return;
-    if (body.section !== section || !body.data || typeof body.data !== 'object') throw new Error('This section returned no result.');
+    if (body?.section !== section || !body.data || typeof body.data !== 'object') throw new UserFacingError('This section returned no result. Please try again.');
     latestReport = mergeNarrative(latestReport, body.data, section);
     window.latestReport = latestReport;
     delete narrative.status[section];
     updateHistory(latestHistoryId, latestReport);
     announce({ insights: 'Analysis details are ready.', coverLetter: 'Cover letter is ready.', interview: 'Interview preparation is ready.' }[section] || 'Section is ready.');
   } catch (error) {
-    if (error.name === 'AbortError' || run !== narrative.runId) return;
+    if (error?.name === 'AbortError' || run !== narrative.runId) return;
     narrative.status[section] = 'error';
-    if (section !== 'insights') toast(friendlyError(error.message)); else announce('Analysis details could not be prepared. Open Strengths or Gaps to try again.');
+    if (!(error instanceof UserFacingError)) console.error('Section failed unexpectedly:', error?.name || 'UnknownError');
+    if (section !== 'insights') toast(userMessage(error), 5000);
+    else announce('Analysis details could not be prepared. Open Strengths or Gaps to try again.');
   } finally {
     narrative.controllers.delete(controller);
     if (run === narrative.runId) refreshNarrativeUI();
@@ -693,7 +737,7 @@ function download(content, type, name) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 }
-$('#copyBtn')?.addEventListener('click', () => navigator.clipboard?.writeText(reportText()).then(() => toast('Fit brief copied.'), () => toast('Could not copy the brief.')));
+$('#copyBtn')?.addEventListener('click', () => copyText(reportText(), 'Fit brief copied.', 'Could not copy the brief.'));
 $('#jsonBtn')?.addEventListener('click', () => { if (!latestReport) return toast('No report to export.'); download(JSON.stringify(latestReport, null, 2), 'application/json', 'nova-fit-brief.json'); toast('JSON downloaded.'); });
 $('#pdfBtn')?.addEventListener('click', async () => {
   const report = $('#report');
