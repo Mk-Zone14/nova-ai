@@ -29,20 +29,29 @@ test('document retains critical accessibility landmarks and labels', () => {
   assert.match(html, /id="loadingPanel" aria-live="polite"/);
   assert.match(html, /id="errorCard" role="alert"/);
   assert.match(html, /for="resumeUpload"/);
-  assert.match(html, /aria-label="Student profile or resume"/);
-  assert.match(html, /aria-label="Opportunity details"/);
+  // Each textarea is named by its visible <label>. An aria-label would override it, and the
+  // accessible name would then differ from the text sighted users see (WCAG 2.5.3 Label in Name).
+  for (const id of ['profileInput', 'opportunityInput']) {
+    assert.match(html, new RegExp(`<label[^>]*for="${id}"`), `${id} needs a visible label`);
+    assert.doesNotMatch(html, new RegExp(`<textarea id="${id}"[^>]*aria-label=`), `${id}: aria-label would override the visible label`);
+  }
   assert.match(html, /aria-pressed="false"/);
 });
 
-test('accessibility wiring: live region and top-layer toast', () => {
+test('accessibility wiring: live region, top-layer toast, loading focus, no role-less aria-label', () => {
   const html = read('index.html');
   const client = read('client.js');
   const css = read('styles.css');
   assert.match(html, /<div class="sr-only" id="liveStatus" role="status" aria-live="polite"/, 'announcements need an always-rendered live region');
   assert.match(html, /id="toast"[^>]*aria-hidden="true"/, 'the visual toast must not be announced twice');
+  assert.match(html, /id="loadingTitle" tabindex="-1"/, 'focus moves here when the form is hidden');
+  assert.match(client, /\$\('#loadingTitle'\)\?\.focus/);
   assert.match(client, /function announce\(/);
   assert.match(css, /\.toast\s*\{[^}]*position:\s*fixed/, 'toast must be positioned in the viewport, not left at the bottom of the page');
   assert.match(css, /\.sr-only\s*\{/);
+  assert.match(css, /\.strategy-grid\s*\{[^}]*minmax\(0,\s*1fr\)/, 'single-column grids must not size to their widest child');
+  const bare = [...html.matchAll(/<(div|span)\b[^>]*\baria-label=[^>]*>/g)].filter((m) => !/\brole=/.test(m[0]));
+  assert.deepEqual(bare.map((m) => m[0]), [], 'aria-label on an element without a role is ignored by assistive tech');
 });
 
 test('client has no new raw HTML sinks and loads the tested model before itself', () => {
@@ -149,4 +158,13 @@ test('client error handling: one request helper, bounded timeouts, no duplicate 
   assert.doesNotMatch(client, /console\.error\([^)]*,\s*(error|err|e)\s*\)/, 'log error names/messages, never whole error objects (may carry payloads)');
   assert.doesNotMatch(client, /alert\(|\.stack\b/, 'no alert() and no stack traces in the UI');
   assert.match(client, /copyText\(/, 'clipboard access goes through the guarded helper');
+});
+
+test('form validation moves focus to the field and marks it invalid; decorative icons are hidden', () => {
+  const client = read('client.js');
+  assert.match(client, /setAttribute\('aria-invalid', 'true'\)/);
+  assert.match(client, /fields\[0\]\.focus\(\)/, 'validation must move focus to the offending field');
+  assert.match(client, /removeAttribute\('aria-invalid'\)/, 'the invalid flag must clear when the user edits');
+  const icons = client.slice(client.indexOf('function icons'), client.indexOf('// Visible toast'));
+  assert.match(icons, /aria-hidden/, 'lucide icons are decorative');
 });

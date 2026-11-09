@@ -98,6 +98,11 @@ const narrative = { runId: 0, inputs: null, status: {}, controllers: new Set() }
 
 function icons() {
   window.lucide?.createIcons();
+  // Icons only decorate text that is already in the button or label; hide them from assistive technology.
+  document.querySelectorAll('svg.lucide, svg[data-lucide]').forEach((svg) => {
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+  });
 }
 
 // Visible toast (top-layer popover so it also shows above the modal dialog) plus a persistent
@@ -420,6 +425,7 @@ async function addResumeFile(file) {
   }
 }
 
+[profileInput, opportunityInput].forEach((field) => field?.addEventListener('input', () => field.removeAttribute('aria-invalid')));
 $('#resumeUpload')?.addEventListener('change', (event) => addResumeFile(event.target.files?.[0]));
 $$('.input-card').forEach((card) => {
   card.addEventListener('dragover', (event) => { event.preventDefault(); card.classList.add('drag-over'); });
@@ -436,6 +442,8 @@ function loading(show) {
   $('#loadingPanel')?.classList.toggle('hidden', !show);
   $('#loadingPanel')?.setAttribute('aria-busy', String(show));
   $('#workspace')?.classList.toggle('hidden', show);
+  // The control that started the analysis is about to be hidden; keep keyboard and screen-reader focus on the status heading.
+  if (show) window.requestAnimationFrame(() => $('#loadingTitle')?.focus({ preventScroll: true }));
   const button = $('#analyzeBtn');
   if (button) button.disabled = show;
 }
@@ -470,9 +478,15 @@ async function runAnalysis() {
   if (abortController) return; // an analysis is already running: never start a duplicate request
   const profile = profileInput.value.trim();
   const opportunity = opportunityInput.value.trim();
-  if (!profile || !opportunity) { toast('Add both your profile and an opportunity first.'); return; }
-  if (profile.length < 50) { toast('Your profile seems too short. Add more detail for a useful analysis.'); return; }
-  if (opportunity.length < 50) { toast('The opportunity description seems too short. Paste the full description.'); return; }
+  const rejectInput = (fields, message) => {
+    fields.forEach((field) => field.setAttribute('aria-invalid', 'true'));
+    fields[0].focus(); // take keyboard and screen-reader users to the problem, not just a toast
+    toast(message);
+  };
+  const missing = [profileInput, opportunityInput].filter((field) => !field.value.trim());
+  if (missing.length) { rejectInput(missing, missing.length === 2 ? 'Add both your profile and an opportunity first.' : `Add ${missing[0] === profileInput ? 'your profile' : 'the opportunity'} first.`); return; }
+  if (profile.length < 50) { rejectInput([profileInput], 'Your profile seems too short. Add more detail for a useful analysis.'); return; }
+  if (opportunity.length < 50) { rejectInput([opportunityInput], 'The opportunity description seems too short. Paste the full description.'); return; }
   $('#errorCard')?.classList.add('hidden');
   $('#report')?.classList.add('hidden');
   resetNarrative(null);
