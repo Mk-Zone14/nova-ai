@@ -79,8 +79,12 @@ for (const [name, attack] of Object.entries(ATTACKS)) {
       assert.deepEqual(Object.keys(data).sort(), EXPECTED_KEYS[builder]);
       assert.deepEqual(Object.keys(data), Object.keys(asJson(benign.user)), 'same field order as for benign input');
       if (data.verified_assessment) {
-        assert.deepEqual(data.verified_assessment, { verdict: 'Needs verification', requirements: ASSESSMENT.rows }, 'the assessment cannot be altered by profile or opportunity text');
-        assert.deepEqual(Object.keys(data.verified_assessment), ['verdict', 'requirements']);
+        // `constraints` is computed in code from the two texts (lib/guards.js); the attack text states no dates or authorization,
+        // so it must produce exactly the facts the benign text produces and must not alter verdict or requirements.
+        const benignAssessment = asJson(benign.user).verified_assessment;
+        assert.deepEqual(data.verified_assessment, { verdict: 'Needs verification', requirements: ASSESSMENT.rows, constraints: benignAssessment.constraints }, 'the assessment cannot be altered by profile or opportunity text');
+        assert.deepEqual(Object.keys(data.verified_assessment), ['verdict', 'requirements', 'constraints']);
+        assert.deepEqual(Object.keys(data.verified_assessment.constraints), ['graduation', 'workAuthorization', 'failedHardRequirements', 'unverifiedHardRequirements']);
       }
       assert.equal(hostile.user.includes(`"verdict":"Eligible"`), false, 'a breakout cannot create a verdict field: any such text is escaped inside a string');
 

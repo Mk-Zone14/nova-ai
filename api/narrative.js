@@ -2,7 +2,7 @@ const rateLimit = require('../lib/rate-limit');
 const {
     sendJson, preflight, validateTexts, TEXT_LIMIT_MESSAGE, callModel, parseModelJson, InvalidModelOutputError, respondWithError
 } = require('../lib/model');
-const { SECTIONS, validateAssessment, sanitizeSection } = require('../lib/narrative');
+const { SECTIONS, validateAssessment, sanitizeSection, guardSection } = require('../lib/narrative');
 
 // One model call per request. Keep under maxDuration in vercel.json.
 const BUDGET_MS = 50_000;
@@ -35,7 +35,10 @@ async function handler(req, res) {
             deadline: Date.now() + BUDGET_MS,
             maxMs: CALL_MAX_MS
         }));
-        const data = sanitizeSection(section, raw);
+        const guarded = guardSection(sanitizeSection(section, raw), texts.profile, texts.opportunity, assessment);
+        // Log that something was withheld and why, never what (it is the applicant's content).
+        if (guarded.removed.length) console.warn(`Narrative guard withheld ${guarded.removed.length} item(s) in ${section}: ${[...new Set(guarded.removed.map((reason) => reason.split(':')[0]))].join('; ')}`);
+        const data = guarded.data;
         if (!config.valid(data)) throw new InvalidModelOutputError();
         return sendJson(res, 200, { section, data });
     } catch (error) {

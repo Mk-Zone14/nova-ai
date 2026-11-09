@@ -80,8 +80,15 @@
       riskAnalysis: arr(report.riskAnalysis),
       interviewQuestions: arr(report.interviewQuestions),
       learningResources: arr(report.learningResources).filter((item) => item && typeof item === 'object' && !Array.isArray(item)),
-      resumeImprovements: arr(report.resumeImprovements)
+      resumeImprovements: arr(report.resumeImprovements),
+      constraintNotes: constraintNotes(report),
+      verifiedMetrics: verifiedMetrics(report)
     };
+  }
+  function verifiedMetricsMarkup(report) {
+    const metrics = verifiedMetrics(report);
+    if (!metrics.length) return '';
+    return `<span class="detail-label">VERIFIED METRICS</span><p class="resource-note">Copied exactly from your profile. Nova does not rewrite these.</p>${metrics.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.label)}: ${safe(item.value)}</strong><span class="status-met">From your profile</span></div>${item.project ? `<p>${safe(item.project)}</p>` : ''}</article>`).join('')}`;
   }
   function friendlyError(message) {
     const raw = String(message || '');
@@ -164,7 +171,23 @@
   function firstText(values, fallback) {
     return arr(values).find((value) => String(value || '').trim()) || fallback;
   }
+  // Deterministic notes computed by /api/analyze from verified constraints (failed hard requirements, graduation window,
+  // work authorization). They are plain { concern, action } strings built from facts, never model prose.
+  // Metrics copied from the applicant's own profile by the server. Shape-checked here; anything malformed is dropped.
+  function verifiedMetrics(report) {
+    return arr(report?.verifiedMetrics)
+      .filter((item) => item && typeof item === 'object' && !Array.isArray(item) && typeof item.label === 'string' && typeof item.value === 'string'
+        && item.label.length <= 40 && item.value.length <= 24 && (item.project == null || (typeof item.project === 'string' && item.project.length <= 80)))
+      .slice(0, 12)
+      .map((item) => ({ label: item.label, value: item.value, project: item.project ?? null }));
+  }
+  function constraintNotes(report) {
+    return arr(report?.constraintNotes).filter((note) => note && typeof note.concern === 'string' && typeof note.action === 'string' && note.concern.trim() && note.action.trim());
+  }
   function biggestConcern(report) {
+    // A failed or unverified hard requirement outranks any skill gap: strengthening skills cannot fix it.
+    const constraint = constraintNotes(report)[0];
+    if (constraint) return constraint.concern;
     const gap = arr(report?.missingSkills)[0];
     if (gap?.skill) return `${gap.skill}${gap.whyItMatters ? ` — ${gap.whyItMatters}` : ''}`;
     const unknownRequirement = requirementItems(report).find((item) => normalizeStatus(item.status).key === 'unknown');
@@ -174,6 +197,8 @@
     return firstText(report?.weaknesses, notAvailable());
   }
   function nextBestAction(report) {
+    const constraint = constraintNotes(report)[0];
+    if (constraint) return constraint.action;
     const improvement = arr(report?.resumeImprovements)[0];
     if (improvement?.suggested) return improvement.suggested;
     return firstText(report?.personalizedRecommendations, firstText(report?.roadmap?.map((item) => item.action), notAvailable()));
@@ -203,9 +228,9 @@
     const durationEl = duration ? `<span class="resource-duration">${safe(duration)}</span>` : '';
     const providerEl = provider ? `<div class="resource-provider">${safe(provider)}</div>` : '';
     const linkEl = resolvedUrl
-      ? `<a class="resource-open-link" href="${safe(resolvedUrl)}" target="_blank" rel="noopener noreferrer">Open resource <i data-lucide="arrow-up-right"></i></a>`
+      ? `<a class="resource-open-link" href="${safe(resolvedUrl)}" target="_blank" rel="noopener noreferrer">Open provider site <i data-lucide="arrow-up-right"></i></a>`
       : `<span class="resource-no-link">No direct link</span>`;
-    return `<article class="resource-card" tabindex="0"><div class="resource-card-top">${badge}${durationEl}</div><div class="resource-card-skill">${safe(skill)}</div><strong class="resource-card-title">${safe(title)}</strong>${providerEl}<div class="resource-card-footer">${linkEl}</div></article>`;
+    return `<article class="resource-card" tabindex="0"><div class="resource-card-top">${badge}${durationEl}</div><div class="resource-card-skill">${safe(skill)}</div><strong class="resource-card-title">${safe(title)}</strong>${providerEl}${resolvedUrl ? '<p class="resource-note">Suggested search. The link opens the provider\'s site, not a verified course page.</p>' : ''}<div class="resource-card-footer">${linkEl}</div></article>`;
   }
 
   // ---- on-demand sections -------------------------------------------------------------------
@@ -299,7 +324,7 @@
     if (module === 'strengths') {
       const strengths = arr(report?.strengths);
       const weaknesses = arr(report?.weaknesses);
-      return { title: 'Strengths & weaknesses', subtitle: `${strengths.length} strengths · ${weaknesses.length} weaknesses`, html: `<div class="detail-summary">These are the strongest signals and limitations Nova found. Use strengths as evidence and weaknesses as edit targets.</div><div class="detail-list"><span class="detail-label">STRENGTHS</span>${strengths.length ? strengths.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-met">Strong evidence</span></div><p>Supporting evidence is present in the supplied profile.</p></article>`).join('') : '<span class="empty">No strengths were returned by Nova.</span>'}<span class="detail-label">WEAKNESSES</span>${weaknesses.length ? weaknesses.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-partial">Needs attention</span></div><p>This limitation was returned by Nova from the supplied evidence.</p></article>`).join('') : '<span class="empty">No weaknesses were returned by Nova.</span>'}</div>` };
+      return { title: 'Strengths & weaknesses', subtitle: `${strengths.length} strengths · ${weaknesses.length} weaknesses`, html: `<div class="detail-summary">These are the strongest signals and limitations Nova found. Use strengths as evidence and weaknesses as edit targets.</div><div class="detail-list">${verifiedMetricsMarkup(report)}<span class="detail-label">STRENGTHS</span>${strengths.length ? strengths.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-met">Strong evidence</span></div><p>Supporting evidence is present in the supplied profile.</p></article>`).join('') : '<span class="empty">No strengths were returned by Nova.</span>'}<span class="detail-label">WEAKNESSES</span>${weaknesses.length ? weaknesses.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-partial">Needs attention</span></div><p>This limitation was returned by Nova from the supplied evidence.</p></article>`).join('') : '<span class="empty">No weaknesses were returned by Nova.</span>'}</div>` };
     }
     if (module === 'gaps') {
       const gaps = arr(report?.missingSkills);
@@ -485,7 +510,7 @@
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
-    statusCounts, firstText, biggestConcern, nextBestAction, contextCandidate,
+    statusCounts, firstText, biggestConcern, nextBestAction, constraintNotes, verifiedMetrics, contextCandidate,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
     hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,
