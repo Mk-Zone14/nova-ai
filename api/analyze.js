@@ -3,6 +3,7 @@ const {
     normalizeRequirements, normalizeMatches, computeAssessment, buildDeterministicReport
 } = require('../lib/eligibility');
 const { createExtractPrompt, createMatchPrompt } = require('../lib/prompts');
+const { deriveFacts, constraintNotes, verifiedMetrics } = require('../lib/guards');
 const {
     MAX_PROFILE_LENGTH, MAX_OPPORTUNITY_LENGTH, MAX_UPSTREAM_RESPONSE_LENGTH, TEXT_LIMIT_MESSAGE,
     sendJson, readRequestBody, isValidModelResponse, parseModelJson, callModel, preflight, validateTexts, respondWithError
@@ -35,7 +36,17 @@ async function runPipeline(profile, opportunity) {
 
     // Stage 3 (code): verdict, score and evidence coverage.
     const assessment = computeAssessment(requirements, matches);
-    return { report: buildDeterministicReport(requirements, matches, dropped, assessment) };
+    const report = buildDeterministicReport(requirements, matches, dropped, assessment);
+
+    // Stage 4 (code): consequences of the verified constraints (graduation window, work authorization, failed or unverified
+    // hard requirements) as plain notes built from facts, so advice never depends on the model reading these correctly.
+    const rows = report.requirementMapping.map(({ requirement, status, hardEligibility, mandatory }) => ({ requirement, status, hardEligibility, mandatory }));
+    const facts = deriveFacts(profile, opportunity, rows);
+    report.constraintNotes = constraintNotes(facts, rows);
+    // Metrics the profile states, copied from the profile itself (exact text, metric type, project), never from the model.
+    report.verifiedMetrics = verifiedMetrics(profile);
+    report._evidenceTrace.facts = facts;
+    return { report };
 }
 
 async function handler(req, res) {

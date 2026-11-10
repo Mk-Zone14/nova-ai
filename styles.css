@@ -360,6 +360,7 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .resource-open-link:hover { text-decoration: underline; }
 .resource-open-link svg { width: 13px; height: 13px; }
 .resource-no-link { font-size: 12px; color: var(--faint); font-style: italic; }
+.resource-note { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 
 
 
