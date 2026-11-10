@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const { complete } = require('./fixtures/insights');
 const guards = require('../lib/guards');
 const prompts = require('../lib/prompts');
 const rateLimit = require('../lib/rate-limit');
@@ -76,7 +77,7 @@ test('figures: ordinary writing is not flagged (years, durations, small counts, 
 });
 
 test('narrative handler: a rewritten metric is withheld from every section, exact metrics survive (production regression)', async () => {
-  const reply = () => ({
+  const reply = () => complete({
     resumeImprovements: [
       { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default-risk classifier (ROC-AUC 0.7744, 79% accuracy)', impact: 'High' },
       { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default-risk classifier (ROC-AUC 0.7738, accuracy 79.4%)', impact: 'High' }
@@ -188,7 +189,7 @@ test('constraint notes: a failed hard requirement is stated as pass/fail; an unv
 });
 
 test('cycle advice: removed when a hard requirement failed (including the audited sentence), kept when none did', async () => {
-  const reply = () => ({
+  const reply = () => complete({
     personalizedRecommendations: [
       'Target Summer 2028 applications once your profile is stronger',
       'Re-apply in the next application cycle',
@@ -207,7 +208,7 @@ test('cycle advice: removed when a hard requirement failed (including the audite
 });
 
 test('narrative prompt: verified constraints reach the model as data and the rules forbid the audited advice', async () => {
-  const { sent } = await runNarrative('insights', () => ({ strengths: ['Python'] }));
+  const { sent } = await runNarrative('insights', () => complete({ strengths: ['Python'] }));
   const data = JSON.parse(sent[0].messages.find((m) => m.role === 'user').content);
   assert.deepEqual(data.verified_assessment.constraints.graduation, { candidate: 'May 2029', requiredWindow: 'December 2027 to June 2028', result: 'outside' });
   assert.equal(data.verified_assessment.constraints.workAuthorization.usStudyOrStatusStated, false);
@@ -228,7 +229,7 @@ test('work authorization: US-study context is detected only from explicit statem
 });
 
 test('visa routes: removed without US context (the audited CPT/OPT advice), allowed with it, other visa facts untouched', async () => {
-  const reply = () => ({
+  const reply = () => complete({
     personalizedRecommendations: [
       'Investigate CPT/OPT eligibility with your university',
       'Look into F-1 and H-1B routes',

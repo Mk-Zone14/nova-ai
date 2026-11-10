@@ -178,3 +178,78 @@ test('work authorization: nothing is inferred from nationality, location or degr
     assert.equal(adviceFor(profile, 'Look into CPT'), false, profile);
   }
 });
+
+// ---- opportunity work-authorization requirement: negation-aware ---------------------------------------------------
+
+const requirementOf = (opportunity, rows = []) => guards.deriveFacts('Student.', opportunity, rows).workAuthorization;
+
+test('work authorization: explicit absence is not a requirement', () => {
+  for (const text of [
+    'No visa or work-authorization requirements.',
+    'No visa requirements.',
+    'No sponsorship required.',
+    'No work-authorization requirements.',
+    'We do not require a visa.',
+    "We don't require sponsorship or a work permit.",
+    'Work authorization is not required.',
+    'Visa not needed.',
+    'Open to applicants regardless of citizenship.',
+    'The programme is open to all.\nNo visa required\nRemote.'
+  ]) {
+    const facts = requirementOf(text);
+    assert.equal(facts.requirement, 'not_required', text);
+    assert.equal(facts.requiredByOpportunity, false, text);
+  }
+});
+
+test('work authorization: genuine positive requirements are preserved', () => {
+  for (const text of [
+    'Candidates must have work authorization.',
+    'Must be authorized to work in India.',
+    'Applicants must hold a valid work visa.',
+    'Only citizens or permanent residents may apply.',
+    'Proof of right to work is required.',
+    'No sponsorship is offered. Candidates must have the right to work in the UK.'
+  ]) {
+    const facts = requirementOf(text);
+    assert.equal(facts.requirement, 'required', text);
+    assert.equal(facts.requiredByOpportunity, true, text);
+  }
+});
+
+test('work authorization: ambiguous, implied or conflicting wording is unknown, never an invented requirement', () => {
+  for (const text of [
+    'Sponsorship is not available.',
+    'We cannot sponsor visas.',
+    'Visa support is available for international students.',
+    'Candidates requiring sponsorship will not be considered.',
+    'No visa required. Candidates must have work authorization.'
+  ]) {
+    const facts = requirementOf(text);
+    assert.equal(facts.requirement, 'unknown', text);
+    assert.equal(facts.requiredByOpportunity, false, text);
+  }
+});
+
+test('work authorization: location, nationality and silence infer nothing', () => {
+  for (const text of ['Based in the United States. Remote friendly.', 'Open to students from India.', 'On-site in Berlin.', '']) {
+    assert.equal(requirementOf(text).requirement, 'not_stated', text);
+  }
+  assert.equal(guards.deriveFacts('Indian citizen studying in the US.', 'Based in the US.', []).workAuthorization.requirement, 'not_stated');
+});
+
+test('work authorization: extracted requirement rows are classified the same way and combined', () => {
+  const row = (requirement) => ({ requirement, status: 'Missing', hardEligibility: true });
+  assert.equal(requirementOf('x', [row('No visa requirements')]).requirement, 'not_required');
+  assert.equal(requirementOf('x', [row('Must have work authorization')]).requirement, 'required');
+  assert.equal(requirementOf('No visa required.', [row('Must have work authorization')]).requirement, 'unknown', 'text and row disagree');
+  assert.equal(requirementOf('Must be authorized to work in India.', [row('Authorized to work in India')]).requirement, 'required');
+});
+
+test('work authorization: a requirement row that says it is NOT needed never produces a work-authorization concern', () => {
+  const rows = [{ requirement: 'No visa or work-authorization requirements', status: 'Missing', hardEligibility: true }];
+  const notes = guards.constraintNotes(guards.deriveFacts('Student.', 'x', rows), rows);
+  assert.equal(notes.some((note) => /work authorization/i.test(note.concern)), false);
+  const positive = [{ requirement: 'Must have work authorization in India', status: 'Missing', hardEligibility: true }];
+  assert.match(guards.constraintNotes(guards.deriveFacts('Student.', 'x', positive), positive)[0].concern, /Work authorization required/);
+});

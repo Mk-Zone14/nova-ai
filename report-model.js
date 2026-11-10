@@ -76,7 +76,6 @@
       requiredDocuments: arr(report.requiredDocuments),
       roadmap: arr(report.roadmap),
       personalizedRecommendations: arr(report.personalizedRecommendations),
-      hiddenRequirements: arr(report.hiddenRequirements),
       riskAnalysis: arr(report.riskAnalysis),
       interviewQuestions: arr(report.interviewQuestions),
       learningResources: arr(report.learningResources).filter((item) => item && typeof item === 'object' && !Array.isArray(item)),
@@ -196,6 +195,22 @@
     if (risk?.risk) return `${risk.risk}${risk.mitigation ? ` — ${risk.mitigation}` : ''}`;
     return firstText(report?.weaknesses, notAvailable());
   }
+  // Where each document came from. Only "stated" and "inferred" (with a quote the server found in the opportunity) count as
+  // coming from the opportunity; anything else, including saved reports from before provenance existed, is Nova's suggestion.
+  function documentGroups(report) {
+    const groups = { fromOpportunity: [], suggested: [] };
+    for (const item of arr(report?.requiredDocuments)) {
+      if (!item || typeof item !== 'object') continue;
+      (item.provenance === 'stated' || item.provenance === 'inferred' ? groups.fromOpportunity : groups.suggested).push(item);
+    }
+    return groups;
+  }
+  function documentMarkup(item) {
+    const label = { stated: 'Stated in the opportunity', inferred: 'Inferred from the opportunity' }[item.provenance] || 'Suggested by Nova';
+    const quote = item.provenance === 'stated' || item.provenance === 'inferred' ? `<p><b>Opportunity text:</b> &ldquo;${safe(item.evidenceQuote || '')}&rdquo;</p>` : '';
+    const done = /completed|ready|not[\s_-]*required/i.test(item.status || '');
+    return `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.document || 'Document')}</strong><span class="status-${done ? 'met' : 'unknown'}">${safe(presentationText(item.status, 'Not enough evidence'))}</span></div><small>${label}</small>${quote}</article>`;
+  }
   function nextBestAction(report) {
     const constraint = constraintNotes(report)[0];
     if (constraint) return constraint.action;
@@ -272,7 +287,7 @@
 
   function strategyMarkup(report, state = {}) {
     const requirements = statusCounts(report);
-    const documents = arr(report?.requiredDocuments);
+    const documents = documentGroups(report).fromOpportunity;
     const pendingDocument = documents.find((item) => !/completed|ready|not[\s_-]*required/i.test(item?.status || ''));
     const insightsPending = ['loading', 'error', 'unavailable'].includes(state.insights);
     const actions = [
@@ -324,15 +339,20 @@
     if (module === 'strengths') {
       const strengths = arr(report?.strengths);
       const weaknesses = arr(report?.weaknesses);
-      return { title: 'Strengths & weaknesses', subtitle: `${strengths.length} strengths · ${weaknesses.length} weaknesses`, html: `<div class="detail-summary">These are the strongest signals and limitations Nova found. Use strengths as evidence and weaknesses as edit targets.</div><div class="detail-list">${verifiedMetricsMarkup(report)}<span class="detail-label">STRENGTHS</span>${strengths.length ? strengths.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-met">Strong evidence</span></div><p>Supporting evidence is present in the supplied profile.</p></article>`).join('') : '<span class="empty">No strengths were returned by Nova.</span>'}<span class="detail-label">WEAKNESSES</span>${weaknesses.length ? weaknesses.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-partial">Needs attention</span></div><p>This limitation was returned by Nova from the supplied evidence.</p></article>`).join('') : '<span class="empty">No weaknesses were returned by Nova.</span>'}</div>` };
+      return { title: 'Strengths & weaknesses', subtitle: `${strengths.length} strengths · ${weaknesses.length} weaknesses`, html: `<div class="detail-summary">These are the strongest signals and limitations Nova found. Use strengths as evidence and weaknesses as edit targets.</div><div class="detail-list">${verifiedMetricsMarkup(report)}<span class="detail-label">STRENGTHS</span>${strengths.length ? strengths.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-partial">Nova observation</span></div><p>Written by Nova from your profile text. Check it against the requirement evidence; it is not a verified match.</p></article>`).join('') : '<span class="empty">No strengths were returned by Nova.</span>'}<span class="detail-label">WEAKNESSES</span>${weaknesses.length ? weaknesses.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item)}</strong><span class="status-partial">Needs attention</span></div><p>This limitation was returned by Nova from the supplied evidence.</p></article>`).join('') : '<span class="empty">No weaknesses were returned by Nova.</span>'}</div>` };
     }
     if (module === 'gaps') {
       const gaps = arr(report?.missingSkills);
       return { title: 'Gaps', subtitle: `${gaps.length} important gaps`, html: `<div class="detail-summary">Start with the highest-impact gap. A missing signal is not a rejection; it is a decision about what to strengthen first.</div><div class="detail-list">${gaps.length ? gaps.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.skill || 'Missing skill')}</strong><span class="status-${String(item.priority || 'medium').toLowerCase() === 'high' ? 'missing' : 'partial'}">${safe(item.priority || 'Priority')}</span></div><p><b>Why it matters:</b> ${safe(item.whyItMatters || 'This skill appears relevant to the opportunity.')}</p><small><b>Learning time:</b> ${safe(item.learningTime || 'Not specified')} · <b>Difficulty:</b> ${safe(item.difficulty || 'Not specified')}</small></article>`).join('') : '<span class="empty">No high-priority gaps were identified.</span>'}</div>` };
     }
     if (module === 'documents') {
-      const documents = arr(report?.requiredDocuments);
-      return { title: 'Documents', subtitle: `${documents.length} required document${documents.length === 1 ? '' : 's'}`, html: `<div class="detail-summary">Use this as the final submission checklist. Status labels come directly from the analysis.</div><div class="detail-list">${documents.length ? documents.map((item) => `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.document || 'Required document')}</strong><span class="status-${/completed|ready|not[\s_-]*required/i.test(item.status || '') ? 'met' : 'unknown'}">${safe(presentationText(item.status, 'Not enough evidence'))}</span></div></article>`).join('') : '<span class="empty">No documents were identified.</span>'}</div>` };
+      const { fromOpportunity, suggested } = documentGroups(report);
+      const group = (title, note, items, empty) => `<span class="detail-label">${title}</span><p class="detail-note">${note}</p>${items.length ? items.map(documentMarkup).join('') : `<span class="empty">${empty}</span>`}`;
+      return {
+        title: 'Documents',
+        subtitle: `${fromOpportunity.length} from the opportunity · ${suggested.length} suggested`,
+        html: `<div class="detail-summary">Only the first group is something the organiser asked for or implied, and each item shows the opportunity text it rests on. The second group is Nova's own suggestion: useful to prepare, but not a requirement.</div><div class="detail-list">${group('FROM THE OPPORTUNITY', 'Stated or implied by the opportunity text.', fromOpportunity, 'No documents were identified in the opportunity text.')}${group('SUGGESTED BY NOVA', 'Recommendations only. The organiser has not asked for these.', suggested, 'No extra documents suggested.')}</div>`
+      };
     }
     if (module === 'risks') {
       const risks = arr(report?.riskAnalysis);
@@ -510,7 +530,7 @@
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
-    statusCounts, firstText, biggestConcern, nextBestAction, constraintNotes, verifiedMetrics, contextCandidate,
+    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, contextCandidate,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
     hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,

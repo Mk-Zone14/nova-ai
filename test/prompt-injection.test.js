@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const { complete } = require('./fixtures/insights');
 const prompts = require('../lib/prompts');
 const rateLimit = require('../lib/rate-limit');
 const analyze = require('../api/analyze');
@@ -213,7 +214,7 @@ test('narrative: every section sends [system, user]; hostile texts and assessmen
   for (const section of ['insights', 'coverLetter', 'interview']) {
     rateLimit.resetRateLimits();
     const sent = [];
-    global.fetch = recordingModel(() => ({ strengths: ['x'], coverLetter: 'Dear team, '.repeat(10), interviewQuestions: [{ question: 'q', whyAsked: 'w', suggestedAnswer: 'a' }] }), sent);
+    global.fetch = recordingModel(() => ({ ...complete({ strengths: ['x'] }), coverLetter: 'Dear team, '.repeat(10), interviewQuestions: [{ question: 'q', whyAsked: 'w', suggestedAnswer: 'a' }] }), sent);
     const res = response();
     await narrative({
       method: 'POST', headers: { 'content-type': 'application/json' }, socket: { remoteAddress: '203.0.113.7' },

@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const { complete } = require('./fixtures/insights');
 const handler = require('../api/narrative');
 const analyze = require('../api/analyze');
 const rateLimit = require('../lib/rate-limit');
@@ -63,7 +64,7 @@ test.after(() => {
 test('insights: one model call, only analysis keys survive, and the model cannot set verdict or scores', async () => {
   const calls = [];
   global.fetch = model({
-    strengths: ['Python'], missingSkills: [{ skill: 'React' }], learningResources: [],
+    ...complete({ strengths: ['Python'], missingSkills: [{ skill: 'React' }], learningResources: [] }),
     overallMatchScore: 99, eligibilityVerdict: 'Eligible', confidenceScore: 99, acceptanceProbability: { percentage: 99 },
     coverLetter: 'should not be here', interviewQuestions: [{ question: 'q' }], requirementMapping: [{ requirement: 'x', status: 'Matched' }]
   }, calls);
@@ -71,13 +72,14 @@ test('insights: one model call, only analysis keys survive, and the model cannot
   assert.equal(res.statusCode, 200);
   assert.equal(res.headers['Cache-Control'], 'no-store');
   assert.equal(calls.length, 1);
-  assert.deepEqual(Object.keys(res.body.data).sort(), ['learningResources', 'missingSkills', 'strengths']);
+  assert.deepEqual(Object.keys(res.body.data).sort(), Object.keys(complete()).sort(), 'only analysis keys: no verdict, scores, cover letter or interview questions');
+  assert.deepEqual(res.body.data.strengths, ['Python']);
   assert.equal(res.body.section, 'insights');
 });
 
 test('prompts carry the verified statuses and the texts as JSON data, and the system message holds none of it', async () => {
   const calls = [];
-  global.fetch = model({ strengths: ['x'] }, calls);
+  global.fetch = model(complete({ strengths: ['x'] }), calls);
   await run();
   const [system, user] = calls[0].messages.map((message) => message.content);
   assert.match(system, /^STAGE: INSIGHTS/);
@@ -203,7 +205,7 @@ test('maps upstream auth failures, timeouts and network errors without leaking d
 // ---- rate limiting ---------------------------------------------------------------------------
 
 test('has its own, higher rate-limit bucket that does not consume the analyze allowance', async () => {
-  global.fetch = model({ strengths: ['x'] });
+  global.fetch = model(complete({ strengths: ['x'] }));
   const headers = { 'content-type': 'application/json' };
   const socket = { remoteAddress: '198.51.100.7' };
   for (let index = 0; index < 20; index++) assert.equal((await run({ ...base({ headers }), socket })).statusCode, 200, `request ${index + 1}`);
@@ -212,4 +214,21 @@ test('has its own, higher rate-limit bucket that does not consume the analyze al
   assert.equal(limited.headers['Retry-After'], '60');
   // the same client can still run analyses
   assert.equal(await rateLimit.isRateLimited(rateLimit.getClientKey({ headers, socket })), false);
+});
+
+test('insights: a reply with report sections missing is rejected as incomplete, never returned as a smaller answer', async () => {
+  const { INSIGHT_LISTS, INSIGHT_OBJECTS } = require('../lib/narrative');
+  const full = complete({ strengths: ['Python'] });
+  for (const key of [...INSIGHT_LISTS, ...INSIGHT_OBJECTS]) {
+    const partial = { ...full };
+    delete partial[key];
+    global.fetch = model(partial);
+    const res = await run();
+    assert.equal(res.statusCode, 502, `missing ${key}`);
+    assert.equal(res.body.data, undefined);
+  }
+  global.fetch = model({ ...full, strengths: 'not a list' });
+  assert.equal((await run()).statusCode, 502, 'a section of the wrong type is not accepted');
+  global.fetch = model(full);
+  assert.equal((await run()).statusCode, 200);
 });

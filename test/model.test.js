@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { callModel, parseModelJson, respondWithError, UpstreamError, InvalidModelOutputError, UNAVAILABLE_MESSAGE } = require('../lib/model');
+const { callModel, parseModelJson, respondWithError, UpstreamError, InvalidModelOutputError, TruncatedOutputError, UNAVAILABLE_MESSAGE } = require('../lib/model');
 
 const realFetch = global.fetch;
 const env = { key: process.env.GROQ_API_KEY, model: process.env.GROQ_MODEL };
@@ -125,4 +125,29 @@ test('every provider failure maps to a safe public response', () => {
     }
     assert.doesNotMatch(quiet.lines.join('\n'), new RegExp(SECRET), 'even an error carrying the key in its message is not logged');
   } finally { quiet.restore(); }
+});
+
+test('a reply that stopped on the output-token limit is rejected even when its JSON happens to parse', async () => {
+  process.env.GROQ_API_KEY = SECRET;
+  // A complete-looking object with sections missing: valid JSON, but finish=length means it was cut off.
+  global.fetch = async () => reply({ choices: [{ message: { content: '{"strengths":["a"]}' }, finish_reason: 'length' }], usage: { prompt_tokens: 2300, completion_tokens: 3060 } })();
+  const info = capture('info');
+  const warn = capture('warn');
+  try {
+    await assert.rejects(call(), (error) => error instanceof TruncatedOutputError && error instanceof InvalidModelOutputError);
+  } finally { info.restore(); warn.restore(); }
+  assert.match(info.lines.join(''), /completion_tokens=3060 finish=length/, 'the usage line is still logged, so the cause is visible');
+  assert.match(warn.lines.join(''), /finish=length/);
+  const out = res();
+  respondWithError(out, new TruncatedOutputError());
+  assert.equal(out.statusCode, 502, 'surfaces as a retryable error, never as partial content');
+});
+
+test('only finish=length is treated as truncation', async () => {
+  process.env.GROQ_API_KEY = SECRET;
+  for (const finish of ['stop', undefined, 'tool_calls']) {
+    global.fetch = async () => reply({ choices: [{ message: { content: '{"a":1}' }, finish_reason: finish }], usage: {} })();
+    const quiet = capture('info');
+    try { assert.equal(await call(), '{"a":1}'); } finally { quiet.restore(); }
+  }
 });

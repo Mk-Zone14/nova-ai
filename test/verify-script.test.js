@@ -3,6 +3,7 @@
 // the owner runs `GROQ_API_KEY=... node scripts/verify-groq.js` (see README).
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const { complete } = require('./fixtures/insights');
 const { verify, sample } = require('../scripts/verify-groq');
 const rateLimit = require('../lib/rate-limit');
 
@@ -25,7 +26,7 @@ const goodMatch = { matches: [
 ] };
 const LETTER = 'Dear Atlas Labs team, '.concat('I am a third-year Computer Science student with hands-on frontend experience from a fintech internship, where I shipped React components used by thousands of users. '.repeat(3), 'Thank you for your consideration.');
 const SECTIONS = {
-  insights: { strengths: ['a'], weaknesses: ['b'], missingSkills: [], roadmap: [], personalizedRecommendations: ['c'], atsReadiness: { score: 70 }, learningResources: [{ skill: 'SQL', resource: 'x', provider: 'y', url: 'https://example.com/sql', type: 'course', timeToComplete: '1h' }] },
+  insights: { ...complete(), strengths: ['a'], weaknesses: ['b'], personalizedRecommendations: ['c'], atsReadiness: { score: 70 }, learningResources: [{ skill: 'SQL', resource: 'x', provider: 'y', url: 'https://example.com/sql', type: 'course', timeToComplete: '1h' }] },
   coverLetter: { coverLetter: LETTER },
   interview: { interviewQuestions: [1, 2, 3].map((n) => ({ question: `Q${n}`, whyAsked: 'w', suggestedAnswer: 'a' })) }
 };

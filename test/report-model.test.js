@@ -272,7 +272,7 @@ test('moduleContent summarises each module with accurate counts', () => {
   assert.equal(moduleContent('requirements', report).subtitle, '1 of 6 mapped requirements matched');
   assert.equal(moduleContent('strengths', report).subtitle, '3 strengths · 1 weaknesses');
   assert.equal(moduleContent('gaps', report).subtitle, '2 important gaps');
-  assert.equal(moduleContent('documents', report).subtitle, '3 required documents');
+  assert.equal(moduleContent('documents', report).subtitle, '0 from the opportunity · 3 suggested', 'saved documents without provenance are never presented as required');
   assert.equal(moduleContent('risks', report).subtitle, '2 risk signals');
   assert.equal(moduleContent('resources', report).subtitle, '3 recommendations', 'junk entries are removed before counting');
   assert.equal(moduleContent('strategy', report).title, 'Application strategy');
