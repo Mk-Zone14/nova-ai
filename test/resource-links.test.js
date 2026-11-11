@@ -183,3 +183,19 @@ test('two gaps that resolve to the same search show one card', () => {
   const resolved = links.resolveResources({ missingSkills: [{ skill: 'Excel' }, { skill: 'excel' }, { skill: 'Familiarity with Excel' }] });
   assert.deepEqual(resolved.map((item) => item.url), ['https://www.coursera.org/search?query=Excel']);
 });
+
+test('real-model regression (Preview, 2026-11-11, second run): a search for a topic is shown once even when the gap and the model word it differently', () => {
+  const r = {
+    missingSkills: [{ skill: 'Google Cloud Platform (GCP) or other cloud platform' }, { skill: 'Docker' }, { skill: 'Microsoft Excel (working knowledge)' }, { skill: 'Unit testing with pytest' }, { skill: 'Advanced SQL (window functions, indexing)' }],
+    learningResources: [{ skill: 'Google Cloud Platform (GCP)', resource: 'Google Cloud Fundamentals', url: 'https://developers.google.com' }, { skill: 'Docker' }, { skill: 'Microsoft Excel' }, { skill: 'pytest' }, { skill: 'Advanced SQL', resource: 'SQL Advanced Topics', url: 'https://www.khanacademy.org' }]
+  };
+  const resolved = links.resolveResources(r);
+  assert.deepEqual(resolved.map((item) => [item.kind, item.id || item.url]), [
+    ['search', 'https://www.coursera.org/search?query=Google%20Cloud%20Platform%20GCP%20cloud%20platform'],
+    ['verified', 'docker'],
+    ['search', 'https://www.coursera.org/search?query=Microsoft%20Excel'],
+    ['verified', 'pytest'],
+    ['verified', 'sql']
+  ]);
+  assert.deepEqual(links.resolveResources({ missingSkills: [{ skill: 'Tableau' }, { skill: 'Power BI' }] }).map((item) => item.url), ['https://www.coursera.org/search?query=Tableau', 'https://www.coursera.org/search?query=Power%20BI'], 'different topics keep separate searches');
+});

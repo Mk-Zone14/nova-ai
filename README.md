@@ -188,14 +188,14 @@ npm run test
 Current test status:
 
 ```text
-321 tests
-321 passed
+322 tests
+322 passed
 0 failed
 ```
 
 ### Real-browser PDF export tests
 
-`npm test` runs only the Node unit tests (the 321 above) and does **not** start a browser. The PDF export is
+`npm test` runs only the Node unit tests (the 322 above) and does **not** start a browser. The PDF export is
 additionally covered by a separate suite in `test-browser/` (PDF export plus saved-history retention) that drives real Chromium against the real, vendored
 html2pdf.js (the library is never stubbed; only the `/api/*` calls are mocked, and failures are injected into the
 browser's canvas APIs). Run it separately:

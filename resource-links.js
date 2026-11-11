@@ -196,6 +196,8 @@
     const out = [];
     const seenSkills = new Set();
     const seenEntries = new Set();
+    const searchWords = []; // one search per topic: "Google Cloud Platform (GCP)" and "GCP or other cloud platform" are the same search
+    const overlaps = (words) => searchWords.some((seen) => [...words].every((word) => seen.has(word)) || [...seen].every((word) => words.has(word)));
     let linked = 0;
     for (const gap of gaps) {
       const cards = resolveAll(gap);
@@ -206,6 +208,11 @@
       for (const card of cards) {
         const target = card.kind === 'verified' ? card.id : card.url;
         if (target && seenEntries.has(target)) continue; // two gaps, one page or one search: show it once
+        if (card.kind === 'search') {
+          const words = new Set(searchQuery(card.skill).toLowerCase().split(' '));
+          if (overlaps(words)) continue;
+          searchWords.push(words);
+        }
         if (target && linked >= MAX_RESOURCES) continue;
         if (target) { seenEntries.add(target); linked += 1; }
         out.push(card);
