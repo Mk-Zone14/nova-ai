@@ -100,6 +100,12 @@
   // URL below was checked by a person before it was added, and it is the page for that topic, not a provider's homepage.
   // A gap with no catalogue entry gets a clearly labelled search-results link, or no link at all. Nothing here is
   // generated: titles, providers and URLs are fixed strings.
+  // SQLBolt is an introduction. A gap that asks for advanced SQL ("Advanced SQL (window functions, indexing)") is not answered by
+  // it, so it falls through to the labelled search instead of a beginner page presented as the fix. An entry may carry an
+  // `unless` pattern; only this one does. Kept narrow on purpose: "advanced" must sit next to the SQL/database words, so
+  // "SQL and advanced Python" still gets SQLBolt for the SQL part.
+  const ADVANCED_SQL = /\b(?:advanced|expert|senior)\s+(?:[a-z+#.]+\s+)?(?:sql|queries|querying|query|databases?)\b|\bsql\s+(?:[a-z]+\s+){0,2}(?:optimi[sz]\w*|tuning|performance)\b|\b(?:query|database)\s+(?:optimi[sz]\w*|tuning|performance)\b|\bwindow functions?\b|\bstored procedures?\b/i;
+
   const CATALOG = [
     { id: 'aws', keywords: ['aws', 'amazon web services', 'amazon cloud'], title: 'Cloud practitioner training (includes the free Cloud Practitioner Essentials course)', provider: 'AWS Training and Certification', url: 'https://aws.amazon.com/training/learn-about/cloud-practitioner/', type: 'Course' },
     { id: 'azure', keywords: ['azure', 'microsoft cloud'], title: 'Microsoft Learn: Azure training', provider: 'Microsoft Learn', url: 'https://learn.microsoft.com/training/azure', type: 'Learning path' },
@@ -110,7 +116,7 @@
     { id: 'open-source', keywords: ['open-source', 'open source', 'oss contribution', 'oss'], title: 'How to Contribute to Open Source', provider: 'Open Source Guides', url: 'https://opensource.guide/how-to-contribute/', type: 'Guide' },
     { id: 'python', keywords: ['python'], title: 'The Python Tutorial', provider: 'docs.python.org', url: 'https://docs.python.org/3/tutorial/', type: 'Documentation' },
     { id: 'pandas', keywords: ['pandas', 'data analysis', 'data wrangling'], title: '10 minutes to pandas', provider: 'pandas docs', url: 'https://pandas.pydata.org/docs/user_guide/10min.html', type: 'Documentation' },
-    { id: 'sql', keywords: ['sql', 'database queries', 'relational database', 'postgresql', 'mysql'], title: 'SQLBolt: interactive SQL lessons', provider: 'SQLBolt', url: 'https://sqlbolt.com/', type: 'Interactive lessons' },
+    { id: 'sql', keywords: ['sql', 'database queries', 'relational database', 'postgresql', 'mysql'], unless: ADVANCED_SQL, title: 'SQLBolt: interactive SQL lessons', provider: 'SQLBolt', url: 'https://sqlbolt.com/', type: 'Interactive lessons' },
     { id: 'javascript', keywords: ['javascript', 'es6', 'ecmascript'], title: 'The Modern JavaScript Tutorial', provider: 'javascript.info', url: 'https://javascript.info/', type: 'Tutorial' },
     { id: 'typescript', keywords: ['typescript'], title: 'The TypeScript Handbook', provider: 'typescriptlang.org', url: 'https://www.typescriptlang.org/docs/handbook/intro.html', type: 'Documentation' },
     { id: 'react', keywords: ['react', 'react.js', 'reactjs'], title: 'React: Quick Start', provider: 'react.dev', url: 'https://react.dev/learn', type: 'Documentation' },
@@ -138,7 +144,7 @@
     if (!text) return [];
     const entries = [];
     for (const { keyword, entry } of KEYWORD_INDEX) {
-      if (!entries.includes(entry) && keywordPattern(keyword).test(text)) entries.push(entry);
+      if (!entries.includes(entry) && keywordPattern(keyword).test(text) && !(entry.unless && entry.unless.test(text))) entries.push(entry);
     }
     return entries;
   }

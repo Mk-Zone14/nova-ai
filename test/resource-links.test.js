@@ -137,7 +137,7 @@ test('real-model regression (Preview, 2026-11-11): a gap naming two topics gives
     ['verified', 'kubernetes'],
     ['verified', 'docker'],
     ['verified', 'pytest'],
-    ['verified', 'sql'],
+    ['search', 'https://www.coursera.org/search?query=Advanced%20SQL%20window%20functions%20indexing'],
     ['search', 'https://www.coursera.org/search?query=Microsoft%20Excel%20for%20reporting'],
     ['none', null],
     ['verified', 'open-source']
@@ -195,7 +195,28 @@ test('real-model regression (Preview, 2026-11-11, second run): a search for a to
     ['verified', 'docker'],
     ['search', 'https://www.coursera.org/search?query=Microsoft%20Excel'],
     ['verified', 'pytest'],
-    ['verified', 'sql']
+    ['search', 'https://www.coursera.org/search?query=Advanced%20SQL%20window%20functions%20indexing']
   ]);
   assert.deepEqual(links.resolveResources({ missingSkills: [{ skill: 'Tableau' }, { skill: 'Power BI' }] }).map((item) => item.url), ['https://www.coursera.org/search?query=Tableau', 'https://www.coursera.org/search?query=Power%20BI'], 'different topics keep separate searches');
+});
+
+test('Item 4: advanced SQL is not mapped to the beginner SQLBolt page; it falls through to the labelled search', () => {
+  const kinds = (skill) => links.resolveAll(skill).map((item) => [item.kind, item.id || item.title]);
+  for (const skill of ['Advanced SQL', 'Advanced SQL (window functions, indexing)', 'advanced relational database design', 'SQL query optimization', 'SQL performance tuning', 'Database query optimisation', 'Expert SQL', 'Stored procedures and window functions']) {
+    const [card] = links.resolveAll(skill);
+    assert.equal(card.kind, 'search', skill);
+    assert.match(card.title, /^Coursera search: /, `${skill}: the card says it is a search`);
+    assert.equal(card.provider, 'Coursera');
+    assert.equal(card.id, undefined, `${skill}: no verified catalogue page`);
+  }
+  // Everything that is genuinely introductory SQL keeps its page.
+  for (const skill of ['SQL', 'SQL fundamentals', 'Basic SQL queries and joins', 'PostgreSQL', 'MySQL', 'Relational database basics', 'Database queries']) {
+    assert.deepEqual(kinds(skill), [['verified', 'sql']], skill);
+  }
+  // "advanced" only counts next to the SQL words: a compound gap still gets SQLBolt for its SQL part.
+  assert.deepEqual(links.resolveAll('SQL and advanced Python').map((item) => item.id).sort(), ['python', 'sql']);
+  assert.deepEqual(links.resolveAll('advanced Python and SQL').map((item) => item.id).sort(), ['python', 'sql']);
+  // The catalogue entry itself is unchanged apart from the guard, and no other entry carries one.
+  assert.equal(links.CATALOG.find((entry) => entry.id === 'sql').url, 'https://sqlbolt.com/');
+  assert.deepEqual(links.CATALOG.filter((entry) => entry.unless).map((entry) => entry.id), ['sql']);
 });
