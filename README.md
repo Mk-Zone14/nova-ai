@@ -154,7 +154,7 @@ Nova AI is designed with security in mind.
 
 * API credentials are stored in environment variables.
 * `.env` files are excluded from version control.
-* Learning-resource links are never taken from the model verbatim: they resolve to a fixed list of known-good URLs by host or exact provider name (`resource-links.js`).
+* Learning-resource links never come from the model. Each skill gap is matched in code to a catalogue of checked pages (`resource-links.js`, 22 entries such as the Docker get-started guide, the Pro Git book, the Python tutorial, Google's ML crash course); the card shows that page, labelled "Verified page". A gap with no catalogue entry gets a labelled Coursera search-results link for the gap's own words, and a gap that is gained through work rather than a course (internships, years of experience) gets no link. The model's resource titles and URLs are ignored entirely; only its skill names are read. `safeResourceUrl` (host/provider whitelist) remains for callers that still hold a model URL.
 * Third-party scripts (pdf.js, html2pdf, lucide) are self-hosted in `vendor/` with recorded SHA-256 hashes, and the CSP allows scripts from this origin only.
 * Rate limiting is shared across serverless instances when Upstash Redis is configured (see below); otherwise it falls back to a per-instance limiter, which does **not** protect your Groq quota on Vercel.
 * Dangerous URL schemes such as `javascript:` and `data:` are rejected.
@@ -188,14 +188,14 @@ npm run test
 Current test status:
 
 ```text
-305 tests
-305 passed
+318 tests
+318 passed
 0 failed
 ```
 
 ### Real-browser PDF export tests
 
-`npm test` runs only the Node unit tests (the 305 above) and does **not** start a browser. The PDF export is
+`npm test` runs only the Node unit tests (the 318 above) and does **not** start a browser. The PDF export is
 additionally covered by a separate suite in `test-browser/` (PDF export plus saved-history retention) that drives real Chromium against the real, vendored
 html2pdf.js (the library is never stubbed; only the `/api/*` calls are mocked, and failures are injected into the
 browser's canvas APIs). Run it separately:
@@ -331,7 +331,7 @@ Resources may include:
 * Technical learning material
 * Open-source contribution guides
 
-Resource links are validated before being rendered as clickable external links.
+Resource links are chosen in code from a catalogue of checked pages, one per skill gap; the model never supplies a URL or a course title. Gaps without a catalogue entry get a labelled search link or no link.
 
 ---
 

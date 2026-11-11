@@ -299,20 +299,20 @@ test('report model: model-written advice never outranks a verified constraint; r
 
 // ---- 4. learning resources --------------------------------------------------------------------------------------------
 
-test('resources: a provider-site link is labelled as one and is not presented as a course link', () => {
+test('resources: a model-invented course title and URL are never shown; a gap with no checked page gets a labelled search link', () => {
   const html = model.resourceMarkup({ skill: 'Excel', resource: 'Financial Modelling Course', provider: 'Coursera', url: 'https://www.coursera.org/learn/some-invented-course', type: 'Course', timeToComplete: '10 hours' });
-  assert.match(html, /href="https:\/\/www\.coursera\.org"/, 'the invented course path is still discarded');
-  assert.match(html, /Open provider site/);
-  assert.match(html, /Suggested search\. The link opens the provider's site, not a verified course page\./);
-  assert.doesNotMatch(html, /Open resource/);
-  assert.match(html, /Financial Modelling Course/, 'the suggested title stays visible as the thing to search for');
+  assert.doesNotMatch(html, /Financial Modelling Course|some-invented-course/, 'nothing the model wrote reaches the card');
+  assert.match(html, /href="https:\/\/www\.coursera\.org\/search\?query=Excel"/, 'a search for the gap, not a homepage and not an invented course page');
+  assert.match(html, /Search results/);
+  assert.match(html, /Nothing here is a verified course/);
+  assert.doesNotMatch(html, /Verified page|Open provider site/);
 });
 
-test('resources: with no resolvable link, no link and no claim about one is shown', () => {
-  const html = model.resourceMarkup({ skill: 'Excel', resource: 'Course', provider: 'Udemy', url: 'https://udemy.com/course/x', type: 'Course' });
+test('resources: a gap gained through work rather than a course gets no link and no claim about one', () => {
+  const html = model.resourceMarkup({ skill: 'Prior internship experience', resource: 'Course', provider: 'Udemy', url: 'https://udemy.com/course/x', type: 'Course' });
   assert.match(html, /No direct link/);
   assert.doesNotMatch(html, /<a /);
-  assert.doesNotMatch(html, /Suggested search/);
+  assert.doesNotMatch(html, /Search results|Verified page|udemy/);
 });
 
 test('resources: the insights prompt asks for suggested searches on provider base URLs and forbids invented course paths', () => {

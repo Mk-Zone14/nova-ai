@@ -259,8 +259,14 @@ test('learning links: only canonical https URLs ever reach an href, hostile ones
   const report = adapted();
   const html = moduleContent('resources', report).html;
   const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
-  assert.deepEqual(hrefs, ['https://www.coursera.org'], 'only the legitimate Coursera card links out');
-  assert.equal((html.match(/No direct link/g) || []).length, 2, 'javascript: and github.com/attacker cards have no link');
+  assert.deepEqual(hrefs, [
+    'https://kubernetes.io/docs/tutorials/kubernetes-basics/',
+    'https://docs.pytest.org/en/stable/getting-started.html',
+    'https://docs.python.org/3/tutorial/',
+    'https://git-scm.com/book/en/v2',
+    'https://www.coursera.org/search?query=Go'
+  ], 'gaps first, then model-named skills; every href is a checked page or a labelled search, never the model URL');
+  assert.doesNotMatch(html, /javascript:|github\.com\/attacker|some-invented-path|Hostile|Fuzzy/, 'model titles and URLs never reach the markup');
   assert.match(html, /rel="noopener noreferrer"/);
   assert.match(html, /target="_blank"/);
 });
@@ -274,7 +280,7 @@ test('moduleContent summarises each module with accurate counts', () => {
   assert.equal(moduleContent('gaps', report).subtitle, '2 important gaps');
   assert.equal(moduleContent('documents', report).subtitle, '0 from the opportunity · 3 suggested', 'saved documents without provenance are never presented as required');
   assert.equal(moduleContent('risks', report).subtitle, '2 risk signals');
-  assert.equal(moduleContent('resources', report).subtitle, '3 recommendations', 'junk entries are removed before counting');
+  assert.equal(moduleContent('resources', report).subtitle, '4 checked pages · 1 other', 'one card per gap; junk entries are ignored');
   assert.equal(moduleContent('strategy', report).title, 'Application strategy');
 });
 
@@ -284,7 +290,7 @@ test('moduleContent shows honest empty states for an empty report and a default 
   assert.match(moduleContent('gaps', empty).html, /No high-priority gaps/);
   assert.match(moduleContent('documents', empty).html, /No documents were identified/);
   assert.match(moduleContent('risks', empty).html, /No significant risks/);
-  assert.match(moduleContent('resources', empty).html, /No resources were generated/);
+  assert.match(moduleContent('resources', empty).html, /No skill gaps to find resources for/);
   assert.match(moduleContent('strategy', empty).html, /data-action="generate-cover-letter"/, 'offers to draft rather than claiming none exists');
   assert.equal(moduleContent('nope', empty).title, 'Evidence');
 });

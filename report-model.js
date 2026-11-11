@@ -251,21 +251,24 @@
     const mandatory = x.mandatory === true ? '<span class="detail-required">Required</span>' : '';
     return `<details class="detail-item"><summary class="detail-item-header"><strong>${requirementText || 'Requirement'}</strong><span class="detail-status-group">${mandatory}<span class="status-${status.key}">${safe(status.label)}</span></span></summary><p><b>Evidence:</b> ${evidence}</p><p><b>Reasoning:</b> ${reasoning}</p><small><b>Confidence:</b> ${confidence}</small></details>`;
   }
+  // A learning-resource card. Accepts a resolved entry from resource-links (kind: verified | search | none) or, for older
+  // callers, a model-style item, of which only the skill name is used: titles and URLs always come from the catalogue.
   function resourceMarkup(resource) {
     if (!resource || typeof resource !== 'object') return '';
-    const skill = String(resource.skill || 'Learning resource');
-    const title = String(resource.resource || resource.skill || 'Resource');
-    const provider = String(resource.provider || '');
-    const type = String(resource.type || '');
-    const duration = String(resource.timeToComplete || '');
-    const resolvedUrl = safeResourceUrl(resource.url, provider || resource.resource);
-    const badge = type ? `<span class="status-unknown resource-type-badge">${safe(type)}</span>` : '';
-    const durationEl = duration ? `<span class="resource-duration">${safe(duration)}</span>` : '';
-    const providerEl = provider ? `<div class="resource-provider">${safe(provider)}</div>` : '';
-    const linkEl = resolvedUrl
-      ? `<a class="resource-open-link" href="${safe(resolvedUrl)}" target="_blank" rel="noopener noreferrer">Open provider site <i data-lucide="arrow-up-right"></i></a>`
-      : `<span class="resource-no-link">No direct link</span>`;
-    return `<article class="resource-card" tabindex="0"><div class="resource-card-top">${badge}${durationEl}</div><div class="resource-card-skill">${safe(skill)}</div><strong class="resource-card-title">${safe(title)}</strong>${providerEl}${resolvedUrl ? '<p class="resource-note">Suggested search. The link opens the provider\'s site, not a verified course page.</p>' : ''}<div class="resource-card-footer">${linkEl}</div></article>`;
+    const entry = typeof resource.kind === 'string' ? resource : linkResolver().resolveResource(resource.skill);
+    if (!entry) return '';
+    const badge = { verified: ['status-met', 'Verified page'], search: ['status-unknown', 'Search results'], none: ['status-unknown', 'No link'] }[entry.kind] || ['status-unknown', 'No link'];
+    const note = {
+      verified: `A page Nova has checked, chosen for this gap. It is the page for the topic, not a homepage.`,
+      search: `Nova has no checked page for this gap, so this opens ${entry.provider} search results for it. Nothing here is a verified course.`,
+      none: 'No learning resource: this is gained through work or projects rather than a course.'
+    }[entry.kind] || '';
+    const typeEl = entry.type ? `<span class="status-unknown resource-type-badge">${safe(entry.type)}</span>` : '';
+    const providerEl = entry.provider ? `<div class="resource-provider">${safe(entry.provider)}</div>` : '';
+    const linkEl = entry.url
+      ? `<a class="resource-open-link" href="${safe(entry.url)}" target="_blank" rel="noopener noreferrer">${entry.kind === 'verified' ? 'Open page' : 'Open search'} <i data-lucide="arrow-up-right"></i></a>`
+      : '<span class="resource-no-link">No direct link</span>';
+    return `<article class="resource-card" tabindex="0"><div class="resource-card-top"><span class="${badge[0]} resource-type-badge">${badge[1]}</span>${typeEl}</div><div class="resource-card-skill">${safe(entry.skill)}</div><strong class="resource-card-title">${safe(entry.title)}</strong>${providerEl}<p class="resource-note">${safe(note)}</p><div class="resource-card-footer">${linkEl}</div></article>`;
   }
 
   // ---- on-demand sections -------------------------------------------------------------------
@@ -319,10 +322,10 @@
     ];
     const coverText = String(report?.coverLetter || '');
     const coverHtml = coverText.split(/\n+/).filter(Boolean).map((para) => `<p>${safe(para)}</p>`).join('');
-    const resources = arr(report?.learningResources);
+    const resources = linkResolver().resolveResources(report);
     const resourcesHtml = resources.length
       ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>`
-      : '<span class="empty">No learning resources were generated.</span>';
+      : '<span class="empty">No skill gaps to find resources for.</span>';
     const questions = arr(report?.interviewQuestions).filter((item) => item && typeof item === 'object');
 
     const cover = draftSection({
@@ -384,8 +387,9 @@
       return { title: 'Application strategy', subtitle: 'A concise path forward', html: strategyMarkup(report, state) };
     }
     if (module === 'resources') {
-      const resources = arr(report?.learningResources);
-      return { title: 'Learning resources', subtitle: `${resources.length} recommendation${resources.length === 1 ? '' : 's'}`, html: `<div class="detail-summary">Click a card to open the resource in a new tab. Resources are matched to the skill gaps in your profile.</div>${resources.length ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>` : '<span class="empty">No resources were generated.</span>'}` };
+      const resources = linkResolver().resolveResources(report);
+      const verified = resources.filter((item) => item.kind === 'verified').length;
+      return { title: 'Learning resources', subtitle: `${verified} checked page${verified === 1 ? '' : 's'} · ${resources.length - verified} other`, html: `<div class="detail-summary">One resource per skill gap. "Verified page" links go to a page Nova has checked for that topic; "Search results" links open a provider search when Nova has no checked page; nothing is generated by the model.</div>${resources.length ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>` : '<span class="empty">No skill gaps to find resources for.</span>'}` };
     }
     return { title: 'Evidence', subtitle: 'Focused details from your fit brief', html: '<span class="empty">No details are available for this module.</span>' };
   }

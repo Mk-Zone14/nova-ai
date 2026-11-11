@@ -40,3 +40,105 @@ test('provider fallback is an exact match, never fuzzy', () => {
 test('a bad URL falls through to a valid provider', () => {
   assert.equal(safeResourceUrl('https://evil.example/x', 'edX'), 'https://www.edx.org');
 });
+
+// ---- F4: verified learning resources ----------------------------------------------------------------------------------
+const links = require('../resource-links');
+const report = require('../report-model');
+
+test('catalogue: every entry is a specific https page on its own host, never a homepage, and each has a title and provider', () => {
+  assert.ok(links.CATALOG.length >= 20);
+  for (const entry of links.CATALOG) {
+    const url = new URL(entry.url);
+    assert.equal(url.protocol, 'https:', entry.id);
+    assert.ok(url.pathname.length > 1 || url.hostname === 'sqlbolt.com' || url.hostname === 'javascript.info', `${entry.id}: ${entry.url} is a homepage`);
+    assert.ok(entry.title.length > 5 && entry.provider.length > 2 && entry.keywords.length > 0, entry.id);
+  }
+  assert.equal(new Set(links.CATALOG.map((entry) => entry.id)).size, links.CATALOG.length, 'ids are unique');
+});
+
+test('generic homepage URLs from the model are never the destination: the gap decides the link', () => {
+  const r = report.adaptNovaReport({ learningResources: [
+    { skill: 'Docker', resource: 'Docker Essentials: A Developer Introduction', provider: 'YouTube', url: 'https://www.youtube.com' },
+    { skill: 'AWS or another cloud platform', resource: 'AWS Cloud Practitioner Essentials', provider: 'Amazon Web Services', url: 'https://cloud.google.com/learn' },
+    { skill: 'Contributions to open-source projects', resource: 'How to Contribute to Open Source', provider: 'YouTube', url: 'https://www.youtube.com' }
+  ] });
+  const resolved = links.resolveResources(r);
+  assert.deepEqual(resolved.map((item) => [item.kind, item.url]), [
+    ['verified', 'https://docs.docker.com/get-started/'],
+    ['verified', 'https://aws.amazon.com/training/course-descriptions/cloud-practitioner-essentials/'],
+    ['verified', 'https://opensource.guide/how-to-contribute/']
+  ]);
+  const html = report.moduleContent('resources', r).html;
+  assert.doesNotMatch(html, /youtube\.com|cloud\.google\.com|Developer Introduction/);
+});
+
+test('malformed or hostile model URLs and titles cannot leak: only skill names are read from the model', () => {
+  const r = report.adaptNovaReport({ learningResources: [
+    { skill: 'Python', url: 'javascript:alert(1)', resource: '<img src=x onerror=1>', provider: 'x' },
+    { skill: 'Git', url: 'https://user:pw@evil.example/git', resource: 'Hostile' },
+    { skill: 'SQL', url: 'not a url at all' },
+    { skill: 'Kubernetes', url: null }, 'junk', null, { url: 'https://docs.docker.com/get-started/' }
+  ] });
+  const resolved = links.resolveResources(r);
+  assert.deepEqual(resolved.map((item) => item.id), ['python', 'git', 'sql', 'kubernetes']);
+  const html = report.moduleContent('resources', r).html;
+  assert.doesNotMatch(html, /javascript:|evil\.example|onerror|Hostile|not a url/);
+  assert.equal(links.resolveResource(''), null);
+  assert.equal(links.resolveResource(null), null);
+  assert.equal(links.resolveResource('!!!').kind, 'none');
+  assert.equal(links.resolveResource('a'.repeat(300)).skill.length, 120, 'skill names are capped');
+});
+
+test('mismatched resources: a gap maps only to its own topic, and the longest keyword wins', () => {
+  const id = (skill) => links.resolveResource(skill).id;
+  assert.equal(id('Familiarity with Docker'), 'docker');
+  assert.equal(id('Experience with AWS or another cloud platform'), 'aws');
+  assert.equal(id('GitHub Actions pipelines'), 'github-actions', 'not plain git');
+  assert.equal(id('Git basics'), 'git');
+  assert.equal(id('Responsive web design with CSS'), 'fcc-web', 'not the generic css entry');
+  assert.equal(id('Node.js APIs'), 'node');
+  assert.equal(id('Unit testing with pytest'), 'pytest');
+  assert.equal(id('TypeScript'), 'typescript');
+  assert.equal(links.resolveResource('Docker').url !== links.resolveResource('Kubernetes').url, true);
+  assert.equal(links.catalogMatch('Gitlab CI'), null, 'substring "git" inside "gitlab" does not match');
+  assert.equal(links.catalogMatch('Javascript'), links.CATALOG.find((entry) => entry.id === 'javascript'));
+  assert.equal(links.catalogMatch('Kotlin'), null);
+});
+
+test('missing resources: no catalogue match gives a labelled search for the gap words, or nothing for gaps gained through work', () => {
+  const excel = links.resolveResource('Experience with Microsoft Excel');
+  assert.deepEqual([excel.kind, excel.url], ['search', 'https://www.coursera.org/search?query=Microsoft%20Excel']);
+  assert.equal(links.searchQuery('Familiarity with basic Tableau dashboards'), 'Tableau dashboards');
+  for (const skill of ['Prior internship experience', '2+ years of experience', 'Industry experience in fintech']) {
+    const item = links.resolveResource(skill);
+    assert.equal(item.kind, 'none', skill);
+    assert.equal(item.url, null);
+  }
+  assert.equal(links.resolveResource('experience with').kind, 'none', 'nothing left after removing filler');
+  assert.deepEqual(links.resolveResources({}), []);
+  assert.deepEqual(links.resolveResources({ missingSkills: 'x', learningResources: 7 }), []);
+});
+
+test('resolveResources: missingSkills come first, duplicates collapse, two gaps on one page show it once, at most six cards', () => {
+  const r = {
+    missingSkills: [{ skill: 'Docker' }, { skill: 'docker containers' }, { skill: 'Prior internship experience' }],
+    learningResources: [{ skill: 'Docker' }, { skill: 'Python' }, { skill: 'SQL' }, { skill: 'React' }, { skill: 'Git' }, { skill: 'Linux' }, { skill: 'Statistics' }]
+  };
+  const resolved = links.resolveResources(r);
+  assert.equal(resolved.length, 6);
+  assert.deepEqual(resolved.map((item) => item.skill), ['Docker', 'Prior internship experience', 'Python', 'SQL', 'React', 'Git']);
+});
+
+test('resourceMarkup renders the three kinds honestly and escapes everything', () => {
+  const verified = report.resourceMarkup(links.resolveResource('Docker'));
+  assert.match(verified, /Verified page[\s\S]*Get started with Docker[\s\S]*href="https:\/\/docs\.docker\.com\/get-started\/"[\s\S]*Open page/);
+  assert.match(verified, /rel="noopener noreferrer"/);
+  const search = report.resourceMarkup(links.resolveResource('Excel <b>macros</b>'));
+  assert.match(search, /Search results[\s\S]*Open search/);
+  assert.doesNotMatch(search, /<b>/);
+  assert.match(search, /&lt;b&gt;/);
+  const none = report.resourceMarkup(links.resolveResource('Prior internship experience'));
+  assert.match(none, /No link[\s\S]*No direct link/);
+  assert.doesNotMatch(none, /<a /);
+  assert.equal(report.resourceMarkup({ skill: '' }), '');
+});

@@ -669,8 +669,8 @@ function renderInsightPanels() {
     setText('#moduleGapsMeta', `${gaps.length} important gap${gaps.length === 1 ? '' : 's'} · View analysis`);
     setText('#moduleDocumentsMeta', `${documents.fromOpportunity.length} from the opportunity · ${documents.suggested.length} suggested · View checklist`);
     setText('#moduleRisksMeta', `${risks.length} identified · View risks`);
-    const resourceCount = arr(report.learningResources).length;
-    setText('#moduleResourcesMeta', resourceCount ? `${resourceCount} resource${resourceCount === 1 ? '' : 's'} · View links` : 'No resources returned');
+    const resourceCount = NovaResources.resolveResources(report).length;
+    setText('#moduleResourcesMeta', resourceCount ? `${resourceCount} resource${resourceCount === 1 ? '' : 's'} · View links` : 'No skill gaps');
     setText('#moduleStrategyMeta', 'Strategy · Cover letter · Interview prep');
   }
 
