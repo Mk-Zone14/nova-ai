@@ -47,6 +47,11 @@ async function handler(req, res) {
         const claimed = guardClaims(section, grounded.data, texts.profile, texts.opportunity);
         guarded.data = claimed.data;
         guarded.removed = [...guarded.removed, ...grounded.removed, ...claimed.removed];
+        // Preview only: what was withheld, as field + category + single generated token, so guard decisions can be reviewed
+        // against real model output. Returned to the applicant, never logged; production replies never carry it.
+        if (withheldDiagnosticsEnabled(process.env) && guarded.removed.length) {
+            guarded.data = { ...guarded.data, _withheld: [...guarded.diagnostics, ...grounded.diagnostics, ...claimed.diagnostics] };
+        }
         // Log that something was withheld and why, never what (it is the applicant's content).
         if (guarded.removed.length) console.warn(`Narrative guard withheld ${guarded.removed.length} item(s) in ${section}: ${[...new Set(guarded.removed.map((reason) => reason.split(':')[0]))].join('; ')}`);
         const data = guarded.data;
@@ -57,4 +62,10 @@ async function handler(req, res) {
     }
 }
 
+// Diagnostics are a review aid for Preview deployments (VERCEL_ENV=preview); production and local runs never attach them.
+function withheldDiagnosticsEnabled(env) {
+    return env.VERCEL_ENV === 'preview';
+}
+
 module.exports = handler;
+module.exports.withheldDiagnosticsEnabled = withheldDiagnosticsEnabled;

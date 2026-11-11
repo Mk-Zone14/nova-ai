@@ -139,7 +139,7 @@ test('a negated mention in generated text is not an affirmative claim, and empty
 test('other sections and malformed data pass through unchanged', () => {
   const letter = { coverLetter: 'Dear team, I am proficient in everything.' };
   assert.equal(claims.guardClaims('coverLetter', letter, PROFILE).data, letter);
-  assert.deepEqual(claims.guardClaims('insights', null, PROFILE), { data: null, removed: [] });
+  assert.deepEqual(claims.guardClaims('insights', null, PROFILE), { data: null, removed: [], diagnostics: [] });
   const odd = complete({ strengths: 'not a list', resumeStrength: 'text', profileSummary: ['list'], resumeImprovements: 'text' });
   const out = claims.guardClaims('insights', odd, PROFILE).data;
   assert.deepEqual([out.strengths, out.resumeStrength, out.profileSummary, out.resumeImprovements], ['not a list', 'text', ['list'], 'text']);
