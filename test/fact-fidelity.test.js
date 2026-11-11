@@ -287,13 +287,13 @@ test('analyze: the audited candidate gets a Not eligible verdict plus determinis
 
 test('report model: model-written advice never outranks a verified constraint; reports without notes behave as before', () => {
   const withModelAdvice = { resumeImprovements: [{ suggested: 'Model rewrite 0.7744' }], personalizedRecommendations: ['Target Summer 2028'], missingSkills: [{ skill: 'Excel', whyItMatters: 'x' }] };
-  assert.equal(model.nextBestAction(withModelAdvice), 'Model rewrite 0.7744', 'unchanged when there are no constraint notes');
+  assert.equal(model.nextBestAction(withModelAdvice), 'Target Summer 2028', 'with no constraint notes the first recommendation is the action (a resume rewrite is never shown as one)');
   assert.equal(model.biggestConcern(withModelAdvice), 'Excel — x');
   const withNote = { ...withModelAdvice, constraintNotes: [{ concern: 'Hard failure', action: 'Confirm with the organiser.' }] };
   assert.equal(model.nextBestAction(withNote), 'Confirm with the organiser.');
   assert.equal(model.biggestConcern(withNote), 'Hard failure');
   const malformed = { ...withModelAdvice, constraintNotes: [null, 'text', { concern: 5, action: 'x' }, { concern: '', action: 'x' }] };
-  assert.equal(model.nextBestAction(malformed), 'Model rewrite 0.7744', 'malformed notes are ignored, never shown');
+  assert.equal(model.nextBestAction(malformed), 'Target Summer 2028', 'malformed notes are ignored, never shown');
   assert.deepEqual(model.adaptNovaReport({ response: { constraintNotes: [null, { concern: 'a', action: 'b' }, { concern: 1 }] } }).constraintNotes, [{ concern: 'a', action: 'b' }]);
 });
 

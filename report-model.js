@@ -231,12 +231,19 @@
     const done = /completed|ready|not[\s_-]*required/i.test(item.status || '');
     return `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.document || 'Document')}</strong><span class="status-${done ? 'met' : 'unknown'}">${safe(presentationText(item.status, 'Not enough evidence'))}</span></div><small>${label}</small>${quote}</article>`;
   }
+  // The action is an instruction to the applicant. A rewritten resume bullet is not one: real runs showed "Completed data
+  // analysis course" as the next best action, which is the bullet's new text, not what to do. Resume rewrites come last and
+  // are phrased as the edit to make.
   function nextBestAction(report) {
     const constraint = constraintNotes(report)[0];
     if (constraint) return constraint.action;
-    const improvement = arr(report?.resumeImprovements)[0];
-    if (improvement?.suggested) return improvement.suggested;
-    return firstText(report?.personalizedRecommendations, firstText(report?.roadmap?.map((item) => item.action), notAvailable()));
+    const recommendation = firstText(report?.personalizedRecommendations, '');
+    if (recommendation) return recommendation;
+    const roadmap = firstText(arr(report?.roadmap).map((item) => item?.action), '');
+    if (roadmap) return roadmap;
+    const improvement = arr(report?.resumeImprovements).find((item) => item && typeof item.current === 'string' && item.current.trim() && typeof item.suggested === 'string' && item.suggested.trim());
+    if (improvement) return `Update your resume: replace “${improvement.current.trim()}” with “${improvement.suggested.trim()}”.`;
+    return notAvailable();
   }
   function contextCandidate(report) {
     const profile = report?.profileSummary || {};
