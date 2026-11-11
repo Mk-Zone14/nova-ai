@@ -35,7 +35,8 @@ async function handler(req, res) {
         const raw = parseModelJson(await callModel({
             ...config.prompt(texts.profile, texts.opportunity, assessment),
             deadline: Date.now() + BUDGET_MS,
-            maxMs: CALL_MAX_MS
+            maxMs: CALL_MAX_MS,
+            maxCompletionTokens: config.maxCompletionTokens
         }));
         const clean = sanitizeSection(section, raw);
         if (config.complete && !config.complete(clean)) {

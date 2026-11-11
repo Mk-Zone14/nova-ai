@@ -59,7 +59,7 @@ test('usage logging records latency, token counts and finish reason, and nothing
   const logs = capture('info');
   try { await call(); } finally { logs.restore(); }
   const line = logs.lines.join('\n');
-  assert.match(line, /Groq call ok: model=openai\/gpt-oss-120b ms=\d+ prompt_tokens=120 completion_tokens=45 finish=stop/);
+  assert.match(line, /Groq call ok: model=openai\/gpt-oss-120b ms=\d+ prompt_tokens=120 completion_tokens=45 reasoning_tokens=n\/a finish=stop/);
   assert.doesNotMatch(line, new RegExp(`${SECRET}|SYSTEM PROMPT|profile text|secretAnswer|the model said`), 'prompts, completions and the key never reach the log');
 });
 
@@ -68,8 +68,42 @@ test('usage logging tolerates missing or hostile usage fields', async () => {
   global.fetch = async () => reply({ choices: [{ message: { content: '{}' }, finish_reason: 'x\ny; DROP' }], usage: { prompt_tokens: 'many', completion_tokens: null } })();
   const logs = capture('info');
   try { await call(); } finally { logs.restore(); }
-  assert.match(logs.lines.join(''), /prompt_tokens=n\/a completion_tokens=n\/a finish=n\/a/);
+  assert.match(logs.lines.join(''), /prompt_tokens=n\/a completion_tokens=n\/a reasoning_tokens=n\/a finish=n\/a/);
   assert.equal(logs.lines.length, 1);
+});
+
+test('usage logging reports reasoning tokens when the provider returns them', async () => {
+  process.env.GROQ_API_KEY = SECRET;
+  global.fetch = async () => reply(okBody('{"a":1}', { usage: { prompt_tokens: 2709, completion_tokens: 3600, completion_tokens_details: { reasoning_tokens: 1210.4 } } }))();
+  const logs = capture('info');
+  try { await call(); } finally { logs.restore(); }
+  assert.match(logs.lines.join(''), /prompt_tokens=2709 completion_tokens=3600 reasoning_tokens=1210 finish=stop/);
+});
+
+test('max_completion_tokens: not sent unless asked for, sent as given, and junk values are ignored', async () => {
+  process.env.GROQ_API_KEY = SECRET;
+  const bodies = [];
+  global.fetch = async (url, options) => { bodies.push(JSON.parse(options.body)); return reply(okBody())(); };
+  const quiet = capture('info');
+  try {
+    await call();
+    await callModel({ system: 's', user: 'u', deadline: Date.now() + 10_000, maxMs: 5_000, maxCompletionTokens: 8192 });
+    for (const junk of [0, -5, 1.5, '8192', NaN, null]) await callModel({ system: 's', user: 'u', deadline: Date.now() + 10_000, maxMs: 5_000, maxCompletionTokens: junk });
+  } finally { quiet.restore(); }
+  assert.equal('max_completion_tokens' in bodies[0], false, 'analyze and the other callers keep the provider default');
+  assert.equal(bodies[1].max_completion_tokens, 8192);
+  for (const body of bodies.slice(2)) assert.equal('max_completion_tokens' in body, false);
+  assert.equal(bodies[1].temperature, 0.2, 'nothing else about the request changed');
+});
+
+test('the truncation guard still rejects finish=length when an explicit limit was sent', async () => {
+  process.env.GROQ_API_KEY = SECRET;
+  global.fetch = async () => reply({ choices: [{ message: { content: '{"strengths":["a"]}' }, finish_reason: 'length' }], usage: { prompt_tokens: 2700, completion_tokens: 8192 } })();
+  const quiet = capture('info');
+  const warn = capture('warn');
+  try {
+    await assert.rejects(callModel({ system: 's', user: 'u', deadline: Date.now() + 10_000, maxMs: 5_000, maxCompletionTokens: 8192 }), TruncatedOutputError);
+  } finally { quiet.restore(); warn.restore(); }
 });
 
 test('provider failures keep their status even when the body is not JSON', async () => {
@@ -136,7 +170,7 @@ test('a reply that stopped on the output-token limit is rejected even when its J
   try {
     await assert.rejects(call(), (error) => error instanceof TruncatedOutputError && error instanceof InvalidModelOutputError);
   } finally { info.restore(); warn.restore(); }
-  assert.match(info.lines.join(''), /completion_tokens=3060 finish=length/, 'the usage line is still logged, so the cause is visible');
+  assert.match(info.lines.join(''), /completion_tokens=3060 reasoning_tokens=n\/a finish=length/, 'the usage line is still logged, so the cause is visible');
   assert.match(warn.lines.join(''), /finish=length/);
   const out = res();
   respondWithError(out, new TruncatedOutputError());

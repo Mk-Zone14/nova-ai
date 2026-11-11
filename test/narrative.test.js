@@ -59,6 +59,32 @@ test.after(() => {
   else process.env.GROQ_API_KEY = originalKey;
 });
 
+// ---- output limit (Item 2) -------------------------------------------------------------------
+
+test('insights sends an explicit completion limit; the other sections and the request shape are unchanged', async () => {
+  const calls = [];
+  global.fetch = model(complete({ strengths: ['Python'] }), calls);
+  assert.equal((await run()).statusCode, 200);
+  assert.equal(calls[0].max_completion_tokens, 8192);
+  assert.equal(calls[0].temperature, 0.2);
+  assert.deepEqual(calls[0].response_format, { type: 'json_object' });
+  global.fetch = model({ coverLetter: LETTER }, calls);
+  assert.equal((await run(withBody({ section: 'coverLetter' }))).statusCode, 200);
+  global.fetch = model({ interviewQuestions: [{ question: 'Why this role?', whyAsked: 'fit', suggestedAnswer: 'Because Python.' }] }, calls);
+  assert.equal((await run(withBody({ section: 'interview' }))).statusCode, 200);
+  assert.equal('max_completion_tokens' in calls[1], false, 'cover letter keeps the provider default');
+  assert.equal('max_completion_tokens' in calls[2], false, 'interview keeps the provider default');
+});
+
+test('insights: a reply cut off by the output limit is still rejected, never shown', async () => {
+  global.fetch = async () => ({ ok: true, status: 200, json: async () => ({ choices: [{ message: { content: JSON.stringify(complete({ strengths: ['Python'] })) }, finish_reason: 'length' }], usage: { prompt_tokens: 2709, completion_tokens: 8192 } }) });
+  const warn = console.warn; const info = console.info; console.warn = () => {}; console.info = () => {};
+  let res;
+  try { res = await run(); } finally { console.warn = warn; console.info = info; }
+  assert.equal(res.statusCode, 502);
+  assert.equal(res.body.data, undefined);
+});
+
 // ---- sections --------------------------------------------------------------------------------
 
 test('insights: one model call, only analysis keys survive, and the model cannot set verdict or scores', async () => {
