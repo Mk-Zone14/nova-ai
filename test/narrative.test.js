@@ -232,3 +232,21 @@ test('insights: a reply with report sections missing is rejected as incomplete, 
   global.fetch = model(full);
   assert.equal((await run()).statusCode, 200);
 });
+
+test('insights: the claim guard runs in the handler after the figure and provenance guards', async () => {
+  const profile = 'Skills: Python. Member of the coding club; helped organise two hackathons. No experience with Docker.';
+  global.fetch = model(complete({
+    strengths: ['Helped organise two hackathons', 'Led two hackathons', 'Familiar with Docker'],
+    resumeImprovements: [{ section: 'x', current: 'helped organise two hackathons', suggested: 'co-organised two hackathons', impact: 'Low' }]
+  }));
+  const warnings = [];
+  const warn = console.warn;
+  console.warn = (line) => warnings.push(String(line));
+  let res;
+  try { res = await run(withBody({ profile })); } finally { console.warn = warn; }
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.data.strengths, ['Helped organise two hackathons']);
+  assert.deepEqual(res.body.data.resumeImprovements, []);
+  assert.match(warnings.join("\n"), /withheld \d+ item\(s\) in insights: claim/);
+  assert.doesNotMatch(warnings.join('\n'), /hackathon|Docker/);
+});

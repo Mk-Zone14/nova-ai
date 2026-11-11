@@ -762,8 +762,11 @@ function renderReport(report, { save = false, inputs = null } = {}) {
   setText('#execRecommendation', latestReport.executiveRecommendation || latestReport.verdictReason || latestReport.finalVerdict || 'Your decision-ready overview will appear here.');
   countTo($('#execScore'), fit);
   setText('#decisionEligibility', verdict);
-  setText('#decisionRequirements', countsData.total ? `${countsData.met} / ${countsData.total}` : 'Not mapped');
+  setText('#decisionRequirements', NovaReport.requirementsMatchText(latestReport) || (countsData.total ? `${countsData.met} / ${countsData.total}` : 'Not mapped'));
   setText('#decisionConfidence', confidence === null ? notAvailable() : `${confidence}%`);
+  const match = NovaReport.requirementsMatch(latestReport);
+  $('#decisionRequirements')?.setAttribute('title', match?.fitExplanation || '');
+  $('#decisionConfidence')?.setAttribute('title', match?.evidenceExplanation || 'Share of requirement statuses that rest on a quote verified in your profile. Not confidence in the verdict.');
   setText('#contextReadiness', latestReport.readinessCategory ? presentationText(latestReport.readinessCategory) : (readiness === null ? notAvailable() : `${readiness}% ready`));
   renderInsightPanels();
 

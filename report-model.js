@@ -180,6 +180,26 @@
       .slice(0, 12)
       .map((item) => ({ label: item.label, value: item.value, project: item.project ?? null }));
   }
+  // Requirements match per tier (required = hard + mandatory; preferred), computed by /api/analyze. Shape-checked.
+  function requirementsMatch(report) {
+    const raw = report?.requirementsMatch;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const tier = (value) => (value && typeof value === 'object' && Number.isInteger(value.total) && Number.isInteger(value.matched) ? value : null);
+    const required = tier(raw.required);
+    const preferred = tier(raw.preferred);
+    if (!required || !preferred) return null;
+    return {
+      required, preferred,
+      fitExplanation: typeof raw.fitExplanation === 'string' ? raw.fitExplanation : '',
+      evidenceExplanation: typeof raw.evidenceExplanation === 'string' ? raw.evidenceExplanation : ''
+    };
+  }
+  function requirementsMatchText(report) {
+    const match = requirementsMatch(report);
+    if (!match) return null;
+    const tierText = (label, tier) => (tier.total ? `${label} ${tier.matched}${tier.partial ? `+${tier.partial} partial` : ''} / ${tier.total}` : `${label} none listed`);
+    return `${tierText('Required', match.required)} · ${tierText('Preferred', match.preferred)}`;
+  }
   function constraintNotes(report) {
     return arr(report?.constraintNotes).filter((note) => note && typeof note.concern === 'string' && typeof note.action === 'string' && note.concern.trim() && note.action.trim());
   }
@@ -334,7 +354,9 @@
   function baseModuleContent(module, report, state) {
     const counts = statusCounts(report);
     if (module === 'requirements') {
-      return { title: 'Requirements', subtitle: `${counts.met} of ${counts.total || 0} mapped requirements matched`, html: `<div class="detail-summary">Each item connects the opportunity requirement to the evidence Nova found in the supplied profile.</div><div class="detail-list">${counts.items.length ? counts.items.map(detailRequirement).join('') : '<span class="empty">No requirements were identified.</span>'}</div>` };
+      const match = requirementsMatch(report);
+      const matchHtml = match ? `<div class="detail-summary"><b>Requirements match:</b> ${safe(requirementsMatchText(report))}. Eligibility depends only on the hard requirements; this count covers every listed requirement.${match.fitExplanation ? `<br><b>Fit score:</b> ${safe(match.fitExplanation)}` : ''}${match.evidenceExplanation ? `<br><b>Evidence coverage:</b> ${safe(match.evidenceExplanation)}` : ''}</div>` : '';
+      return { title: 'Requirements', subtitle: `${counts.met} of ${counts.total || 0} mapped requirements matched`, html: `<div class="detail-summary">Each item connects the opportunity requirement to the evidence Nova found in the supplied profile.</div>${matchHtml}<div class="detail-list">${counts.items.length ? counts.items.map(detailRequirement).join('') : '<span class="empty">No requirements were identified.</span>'}</div>` };
     }
     if (module === 'strengths') {
       const strengths = arr(report?.strengths);
@@ -407,7 +429,8 @@
       `Organization: ${report.opportunitySummary?.organization || ''}`,
       `Fit score: ${numberOrNull(report.overallMatchScore) === null ? notAvailable() : `${numberOrNull(report.overallMatchScore)}/100`}`,
       `Verdict: ${humanizeVerdict(report.eligibilityVerdict || '')}`,
-      `Requirements: ${countsData.met}/${countsData.total || 0} matched`,
+      `Requirements: ${countsData.met}/${countsData.total || 0} matched${requirementsMatchText(report) ? ` (${requirementsMatchText(report)})` : ''}`,
+      `Evidence coverage: ${numberOrNull(report.evidenceCoverage ?? report.confidenceScore) === null ? notAvailable() : `${numberOrNull(report.evidenceCoverage ?? report.confidenceScore)}% of requirement statuses rest on a verified profile quote (not confidence in the verdict)`}`,
       `Readiness: ${report.readinessCategory || (numberOrNull(report.applicationReadiness) === null ? notAvailable() : `${numberOrNull(report.applicationReadiness)}%`)}`,
       '',
       'WHY THIS VERDICT',
@@ -530,7 +553,7 @@
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
-    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, contextCandidate,
+    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
     hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,

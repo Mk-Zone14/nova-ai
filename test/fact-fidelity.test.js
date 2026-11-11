@@ -79,8 +79,8 @@ test('figures: ordinary writing is not flagged (years, durations, small counts, 
 test('narrative handler: a rewritten metric is withheld from every section, exact metrics survive (production regression)', async () => {
   const reply = () => complete({
     resumeImprovements: [
-      { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default-risk classifier (ROC-AUC 0.7744, 79% accuracy)', impact: 'High' },
-      { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default-risk classifier (ROC-AUC 0.7738, accuracy 79.4%)', impact: 'High' }
+      { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default risk classifier (ROC-AUC 0.7744, 79% accuracy)', impact: 'High' },
+      { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default risk classifier (ROC-AUC 0.7738, accuracy 79.4%)', impact: 'High' }
     ],
     personalizedRecommendations: ['Lead with the ROC-AUC of 0.7744 in applications', 'Learn Excel modelling for 10 hours'],
     strengths: ['Project accuracy 79.4%', 'Project accuracy of roughly 79%'],
@@ -89,7 +89,7 @@ test('narrative handler: a rewritten metric is withheld from every section, exac
   const { res, warnings } = await runNarrative('insights', reply);
   assert.equal(res.statusCode, 200);
   const data = res.body.data;
-  assert.deepEqual(data.resumeImprovements.map((item) => item.suggested), ['Built a default-risk classifier (ROC-AUC 0.7738, accuracy 79.4%)']);
+  assert.deepEqual(data.resumeImprovements.map((item) => item.suggested), ['Built a default risk classifier (ROC-AUC 0.7738, accuracy 79.4%)']);
   assert.deepEqual(data.personalizedRecommendations, ['Learn Excel modelling for 10 hours']);
   assert.deepEqual(data.strengths, ['Project accuracy 79.4%']);
   assert.deepEqual(data.profileSummary, { cgpa: '8.83/10', projects: ['Credit Card Default Prediction (ROC-AUC 0.7738)'] });

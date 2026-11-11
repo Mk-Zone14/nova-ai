@@ -24,7 +24,7 @@ async function runPipeline(profile, opportunity) {
         ...createExtractPrompt(opportunity),
         deadline, maxMs: EXTRACT_MAX_MS
     }));
-    const { requirements, dropped } = normalizeRequirements(extractRaw, opportunity);
+    const { requirements, dropped, recovered, reclassified } = normalizeRequirements(extractRaw, opportunity);
     if (!requirements.length) return { noRequirements: true };
 
     // Stage 2: match against the profile. Evidence is verified in code, not trusted.
@@ -36,7 +36,7 @@ async function runPipeline(profile, opportunity) {
 
     // Stage 3 (code): verdict, score and evidence coverage.
     const assessment = computeAssessment(requirements, matches);
-    const report = buildDeterministicReport(requirements, matches, dropped, assessment);
+    const report = buildDeterministicReport(requirements, matches, dropped, assessment, { recovered, reclassified });
 
     // Stage 4 (code): consequences of the verified constraints (graduation window, work authorization, failed or unverified
     // hard requirements) as plain notes built from facts, so advice never depends on the model reading these correctly.

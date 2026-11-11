@@ -4,6 +4,7 @@ const {
 } = require('../lib/model');
 const { SECTIONS, validateAssessment, sanitizeSection, guardSection } = require('../lib/narrative');
 const { applyProvenance } = require('../lib/provenance');
+const { guardClaims } = require('../lib/claims');
 
 // One model call per request. Keep under maxDuration in vercel.json.
 const BUDGET_MS = 50_000;
@@ -43,8 +44,9 @@ async function handler(req, res) {
         }
         const guarded = guardSection(clean, texts.profile, texts.opportunity, assessment);
         const grounded = applyProvenance(section, guarded.data, texts.opportunity);
-        guarded.data = grounded.data;
-        guarded.removed = [...guarded.removed, ...grounded.removed];
+        const claimed = guardClaims(section, grounded.data, texts.profile, texts.opportunity);
+        guarded.data = claimed.data;
+        guarded.removed = [...guarded.removed, ...grounded.removed, ...claimed.removed];
         // Log that something was withheld and why, never what (it is the applicant's content).
         if (guarded.removed.length) console.warn(`Narrative guard withheld ${guarded.removed.length} item(s) in ${section}: ${[...new Set(guarded.removed.map((reason) => reason.split(':')[0]))].join('; ')}`);
         const data = guarded.data;
