@@ -261,7 +261,7 @@ test('learning links: only canonical https URLs ever reach an href, hostile ones
   const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
   assert.deepEqual(hrefs, [
     'https://kubernetes.io/docs/tutorials/kubernetes-basics/',
-    'https://docs.pytest.org/en/stable/getting-started.html',
+    'https://www.coursera.org/search?query=Testing',
     'https://docs.python.org/3/tutorial/',
     'https://git-scm.com/book/en/v2',
     'https://www.coursera.org/search?query=Go'
@@ -280,7 +280,7 @@ test('moduleContent summarises each module with accurate counts', () => {
   assert.equal(moduleContent('gaps', report).subtitle, '2 important gaps');
   assert.equal(moduleContent('documents', report).subtitle, '0 from the opportunity · 3 suggested', 'saved documents without provenance are never presented as required');
   assert.equal(moduleContent('risks', report).subtitle, '2 risk signals');
-  assert.equal(moduleContent('resources', report).subtitle, '4 checked pages · 1 other', 'one card per gap; junk entries are ignored');
+  assert.equal(moduleContent('resources', report).subtitle, '3 checked pages · 2 other', 'one card per gap; junk entries are ignored');
   assert.equal(moduleContent('strategy', report).title, 'Application strategy');
 });
 

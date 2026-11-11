@@ -65,7 +65,7 @@ test('generic homepage URLs from the model are never the destination: the gap de
   const resolved = links.resolveResources(r);
   assert.deepEqual(resolved.map((item) => [item.kind, item.url]), [
     ['verified', 'https://docs.docker.com/get-started/'],
-    ['verified', 'https://aws.amazon.com/training/course-descriptions/cloud-practitioner-essentials/'],
+    ['verified', 'https://aws.amazon.com/training/learn-about/cloud-practitioner/'],
     ['verified', 'https://opensource.guide/how-to-contribute/']
   ]);
   const html = report.moduleContent('resources', r).html;
@@ -119,14 +119,32 @@ test('missing resources: no catalogue match gives a labelled search for the gap 
   assert.deepEqual(links.resolveResources({ missingSkills: 'x', learningResources: 7 }), []);
 });
 
-test('resolveResources: missingSkills come first, duplicates collapse, two gaps on one page show it once, at most six cards', () => {
+test('resolveResources: missingSkills come first, duplicates collapse, two gaps on one page show it once, linked cards are capped', () => {
   const r = {
     missingSkills: [{ skill: 'Docker' }, { skill: 'docker containers' }, { skill: 'Prior internship experience' }],
-    learningResources: [{ skill: 'Docker' }, { skill: 'Python' }, { skill: 'SQL' }, { skill: 'React' }, { skill: 'Git' }, { skill: 'Linux' }, { skill: 'Statistics' }]
+    learningResources: [{ skill: 'Docker' }, { skill: 'Python' }, { skill: 'SQL' }, { skill: 'React' }, { skill: 'Git' }, { skill: 'Linux' }, { skill: 'Statistics' }, { skill: 'TypeScript' }, { skill: 'Kubernetes' }]
   };
   const resolved = links.resolveResources(r);
-  assert.equal(resolved.length, 6);
-  assert.deepEqual(resolved.map((item) => item.skill), ['Docker', 'Prior internship experience', 'Python', 'SQL', 'React', 'Git']);
+  assert.deepEqual(resolved.map((item) => item.skill), ['Docker', 'Prior internship experience', 'Python', 'SQL', 'React', 'Git', 'Linux', 'Statistics', 'TypeScript']);
+  assert.equal(resolved.filter((item) => item.url).length, 8, 'eight linked cards at most; a "No link" card does not use a slot');
+});
+
+test('real-model regression (Preview, 2026-11-11): a gap naming two topics gives both pages, and a seventh gap is not dropped', () => {
+  const gaps = ['Google Cloud Platform (GCP) or another cloud platform', 'Docker and Kubernetes', 'Unit testing with pytest', 'Advanced SQL (window functions, indexing)', 'Microsoft Excel for reporting', 'Prior internship experience', 'Contributions to open\u2011source projects'];
+  const resolved = links.resolveResources({ missingSkills: gaps.map((skill) => ({ skill })) });
+  assert.deepEqual(resolved.map((item) => [item.kind, item.id || item.url]), [
+    ['search', 'https://www.coursera.org/search?query=Google%20Cloud%20Platform%20GCP%20cloud%20platform'],
+    ['verified', 'kubernetes'],
+    ['verified', 'docker'],
+    ['verified', 'pytest'],
+    ['verified', 'sql'],
+    ['search', 'https://www.coursera.org/search?query=Microsoft%20Excel%20for%20reporting'],
+    ['none', null],
+    ['verified', 'open-source']
+  ]);
+  assert.deepEqual(links.resolveAll('Docker and Kubernetes').map((item) => item.id), ['kubernetes', 'docker']);
+  assert.deepEqual(links.resolveAll('Prior internship experience').map((item) => item.kind), ['none']);
+  assert.deepEqual(links.resolveAll(''), []);
 });
 
 test('resourceMarkup renders the three kinds honestly and escapes everything', () => {
@@ -141,4 +159,27 @@ test('resourceMarkup renders the three kinds honestly and escapes everything', (
   assert.match(none, /No link[\s\S]*No direct link/);
   assert.doesNotMatch(none, /<a /);
   assert.equal(report.resourceMarkup({ skill: '' }), '');
+});
+
+test('mismatch regressions: a generic or differently-vendored gap never gets another vendor\'s page', () => {
+  const kind = (skill) => links.resolveResource(skill).kind;
+  const id = (skill) => links.resolveResource(skill).id;
+  assert.equal(kind('Google Cloud Platform (GCP)'), 'search', 'GCP is not AWS');
+  assert.equal(kind('Cloud deployment'), 'search', 'a vendor is not chosen for a generic cloud gap');
+  assert.equal(id('Experience with AWS or another cloud platform'), 'aws', 'a named vendor still matches');
+  assert.equal(kind('Testing'), 'search', 'language-agnostic testing is not pytest');
+  assert.equal(kind('regression testing'), 'search', 'not machine learning');
+  assert.equal(kind('classification of documents'), 'search', 'not machine learning');
+  assert.equal(id('Unit testing with pytest'), 'pytest');
+  assert.equal(kind('Next.js'), 'search', 'a framework name containing "js" is not the JavaScript tutorial');
+  assert.equal(kind('Terminal velocity physics'), 'search', '"terminal" alone is not Linux');
+  assert.equal(id('Shell scripting'), 'linux');
+  const shortAllowed = new Set(['ml']); // "ML" is common posting shorthand and only matches as a whole word
+  for (const entry of links.CATALOG) for (const keyword of entry.keywords) assert.ok(keyword.length >= 3 || shortAllowed.has(keyword), `${entry.id}: keyword "${keyword}" is too short to be safe`);
+  assert.equal(links.catalogMatch('HTML and XML'), links.CATALOG.find((entry) => entry.id === 'web'), '"ml" inside html/xml does not match');
+});
+
+test('two gaps that resolve to the same search show one card', () => {
+  const resolved = links.resolveResources({ missingSkills: [{ skill: 'Excel' }, { skill: 'excel' }, { skill: 'Familiarity with Excel' }] });
+  assert.deepEqual(resolved.map((item) => item.url), ['https://www.coursera.org/search?query=Excel']);
 });
