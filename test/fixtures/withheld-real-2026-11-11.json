@@ -1,0 +1,40 @@
+{
+  "about": "Real /api/narrative insights output from Vercel Preview (build 7e56942, dpl_3Mdd64j6diNy5Efwcx9VskDBZsdM, openai/gpt-oss-120b via Groq), captured 2026-11-11 before the F3 refinements. `withheld` is the exact data._withheld the Preview returned. Diagnostics carry the single triggering token only (by design), so the withheld sentences themselves were not retained; the tests build representative sentences around each token.",
+  "profile": "Aarav Mehta is a 20-year-old second-year B.Tech Computer Science student at VIT Vellore, India, graduating May 2027. CGPA 8.4/10. Skills: React, Node.js, Python, SQL (basic queries and joins), Git. Projects: CampusConnect, a full-stack web app (React, Node.js, PostgreSQL) used by 40 classmates to share notes; Churn Predictor, a Python scikit-learn model with 88.5% accuracy. Member of the coding club; helped organise two hackathons. Completed a data analysis course. Have not used Excel beyond basics. No experience with cloud platforms or Docker. Available 15 hours per week.",
+  "opportunity": "Software Engineering Intern — Northwind Labs\nLocation: Bengaluru or remote, India | Deadline: 30 September 2026\nEligibility: currently enrolled undergraduate student in India, graduating between May 2027 and December 2027.\nRequired: proficiency in Python or JavaScript; SQL fundamentals; experience building a web application; availability of 15 hours per week.\nPreferred: Docker, cloud deployment (AWS or GCP), Excel or data analysis, teamwork and communication.\nSubmit a resume and a short cover letter.",
+  "withheld": [
+    { "field": "strengths", "reason": "unsupported claim word", "token": "proficiency" },
+    { "field": "strengths", "reason": "contradicts profile", "token": "basic" },
+    { "field": "strengths", "reason": "untraceable text", "token": "organized" },
+    { "field": "resumeStrength.highlights", "reason": "unsupported claim word", "token": "proficiency" },
+    { "field": "resumeStrength.highlights", "reason": "contradicts profile", "token": "basics" },
+    { "field": "resumeStrength.highlights", "reason": "untraceable text", "token": "development" },
+    { "field": "resumeStrength.highlights", "reason": "unsupported claim word", "token": "experience" },
+    { "field": "resumeStrength.highlights", "reason": "untraceable text", "token": "organisation" },
+    { "field": "resumeImprovements", "reason": "unsupported claim word", "token": "adopted" },
+    { "field": "resumeImprovements", "reason": "unsupported claim word", "token": "co-organised" },
+    { "field": "resumeImprovements", "reason": "term not in profile", "token": "co-organised" }
+  ],
+  "survived": {
+    "strengths": [
+      "Currently enrolled undergraduate student in India",
+      "Graduating May 2027",
+      "Built a full‑stack web application (CampusConnect) used by 40 classmates",
+      "Completed a data analysis course",
+      "Available 15 hours per week"
+    ],
+    "highlights": ["Data analysis project with 88.5% accuracy"],
+    "programmingLanguages": ["Python"]
+  },
+  "verdicts": {
+    "proficiency": "true positive: a skills list is not proficiency and the profile never says it",
+    "experience": "true positive: the profile only uses the word inside 'No experience with cloud platforms or Docker'",
+    "adopted": "true positive: upgrade of 'used by 40 classmates'",
+    "co-organised": "true positive: upgrade of 'helped organise'",
+    "basic": "false positive: negation of 'Excel beyond basics' leaked onto SQL (basic queries and joins)",
+    "basics": "false positive: same cause",
+    "organized": "false positive: US spelling of 'organise'",
+    "organisation": "false positive: noun form of 'organise'",
+    "development": "false positive: generic noun, like 'developed' and 'web', carries no claim"
+  }
+}
