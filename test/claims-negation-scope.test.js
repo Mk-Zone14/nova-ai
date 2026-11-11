@@ -126,6 +126,14 @@ test('traceability: spelling and inflection variants of a profile word are the s
   assert.deepEqual(tokensOf(invented), ['conference'], 'a word that is not in the profile is still untraceable');
 });
 
+test('traceability: "queries" in the profile makes "query" traceable (found in a second real run)', () => {
+  const profile = 'Skills: Python, SQL (basic queries and joins), Git.';
+  const ok = claims.guardClaims('insights', complete({ strengths: ['SQL query skills listed with Python'] }), profile, '');
+  assert.deepEqual(tokensOf(ok).filter((token) => token !== 'skills'), [], JSON.stringify(ok.diagnostics));
+  const bad = claims.guardClaims('insights', complete({ strengths: ['SQL query optimisation'] }), profile, '');
+  assert.ok(tokensOf(bad).includes('optimisation'), 'a word that is not in the profile is still untraceable');
+});
+
 test('traceability: neutral vocabulary is exempt, claim and technology words are not', () => {
   const profile = 'Skills: Python, React. Churn Predictor reached 88.5% accuracy.';
   const ok = claims.guardClaims('insights', complete({ strengths: ['Web development in React', 'Quantified churn accuracy at 88.5%'] }), profile, '');
