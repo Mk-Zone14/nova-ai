@@ -69,7 +69,11 @@ test('missing: preferred lines the model left out are added as preferred, with t
     assert.equal(item.recovered, true);
     assert.ok(OPPORTUNITY.includes(item.sourceQuote), 'the quote is verbatim from the posting');
   }
-  assert.deepEqual(reclassified, []);
+  // F2: the posting's skill and project lines were marked hard by the model and are downgraded to mandatory (test/classification.test.js).
+  assert.deepEqual(reclassified.map((item) => [item.requirement, item.was, item.reason]), [
+    ['Proficiency in Python', 'hard', 'skill-or-experience'],
+    ['At least one completed software project', 'hard', 'skill-or-experience']
+  ]);
   assert.deepEqual(dropped, []);
   assert.deepEqual(requirements.map((item) => item.id), ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8', 'R9']);
 });
@@ -93,8 +97,10 @@ test('inconsistently classified: a preferred-section item marked hard or mandato
   const docker = requirements.find((item) => item.requirement === 'Familiarity with Docker');
   const internship = requirements.find((item) => item.requirement === 'Prior internship experience');
   assert.deepEqual([docker.hardEligibility, docker.mandatory, internship.hardEligibility, internship.mandatory], [false, false, false, false]);
-  assert.deepEqual(reclassified, [{ id: docker.id, requirement: 'Familiarity with Docker', was: 'hard' }, { id: internship.id, requirement: 'Prior internship experience', was: 'mandatory' }]);
-  assert.equal(requirements.find((item) => item.requirement === 'Proficiency in Python').hardEligibility, true, 'items outside the section keep the model classification');
+  assert.deepEqual(reclassified.filter((item) => !item.reason), [{ id: docker.id, requirement: 'Familiarity with Docker', was: 'hard' }, { id: internship.id, requirement: 'Prior internship experience', was: 'mandatory' }], 'F1 preferred-section downgrades are unchanged');
+  assert.equal(requirements.find((item) => item.requirement === 'Based in India').hardEligibility, true, 'a gate outside the section keeps the model classification');
+  const python = requirements.find((item) => item.requirement === 'Proficiency in Python');
+  assert.deepEqual([python.hardEligibility, python.mandatory], [false, true], 'F2: a skill outside the section is no longer a gate, but stays mandatory');
   const unlisted = normalizeRequirements({ requirements: [{ requirement: 'Open to candidates based in India', sourceQuote: 'Open to candidates based in India.', mandatory: false, hardEligibility: false }] }, OPPORTUNITY);
   assert.equal(unlisted.requirements[0].mandatory, false, 'a non-mandatory item outside the section is not promoted');
 });
@@ -110,13 +116,15 @@ test('recovered requirements flow through matching, scoring and the verdict like
     { requirementId: 'R6', status: 'Missing' }, { requirementId: 'R7', status: 'Missing' }, { requirementId: 'R8', status: 'Missing' }, { requirementId: 'R9', status: 'Missing' }
   ] }, requirements, PROFILE);
   const assessment = computeAssessment(requirements, matches);
-  // Production numbers for this posting: 15 of 19 weighted points, 5 of 9 verified quotes.
-  assert.equal(assessment.fitScore, 79);
+  // Before F2 this posting scored 15 of 19 weighted points (fit 79) because Python and the project were hard (weight 3).
+  // Now they are mandatory (weight 2): 3 hard x 3 + 2 mandatory x 2 = 13 of 13 required, 13 of 17 overall. Formula unchanged
+  // (the old 15/19 arithmetic is still pinned in test/classification.test.js with the flags set directly).
+  assert.equal(assessment.fitScore, 76);
   assert.equal(assessment.evidenceCoverage, 56);
   assert.equal(assessment.verdict, 'Eligible', 'preferred gaps never affect eligibility');
-  assert.deepEqual(assessment.requirementsMatch.required, { total: 5, matched: 5, partial: 0, missing: 0, unknown: 0, percent: 100, weightedEarned: 15, weightedPossible: 15 });
+  assert.deepEqual(assessment.requirementsMatch.required, { total: 5, matched: 5, partial: 0, missing: 0, unknown: 0, percent: 100, weightedEarned: 13, weightedPossible: 13 });
   assert.deepEqual(assessment.requirementsMatch.preferred, { total: 4, matched: 0, partial: 0, missing: 4, unknown: 0, percent: 0, weightedEarned: 0, weightedPossible: 4 });
-  assert.match(assessment.requirementsMatch.fitExplanation, /^Fit score 79 = weighted credit 15 ÷ weighted total 19 \(required tier 15\/15, preferred tier 0\/4\)/);
+  assert.match(assessment.requirementsMatch.fitExplanation, /^Fit score 76 = weighted credit 13 ÷ weighted total 17 \(required tier 13\/13, preferred tier 0\/4\)/);
   assert.match(assessment.requirementsMatch.evidenceExplanation, /^Evidence coverage 56% = 5 of 9 requirement statuses rest on a quote verified in your profile\. It is not confidence in the verdict\./);
   assert.deepEqual(WEIGHT, { hard: 3, mandatory: 2, preferred: 1 }, 'formula constants unchanged');
   assert.deepEqual(STATUS_CREDIT, { Matched: 1, 'Partial Match': 0.5, Missing: 0, Unknown: 0 });
@@ -134,7 +142,7 @@ test('partial credit and empty tiers are reported honestly', () => {
   const { requirementsMatch } = computeAssessment(requirements, matches);
   assert.deepEqual([requirementsMatch.required.partial, requirementsMatch.required.percent], [1, 50]);
   assert.deepEqual([requirementsMatch.preferred.matched, requirementsMatch.preferred.unknown, requirementsMatch.preferred.percent], [1, 1, 50]);
-  assert.match(requirementsMatch.fitExplanation, /weighted credit 2\.5 ÷ weighted total 5/);
+  assert.match(requirementsMatch.fitExplanation, /weighted credit 2 ÷ weighted total 4/);
   const none = computeAssessment([], []);
   assert.equal(none.requirementsMatch.required.percent, null);
   assert.equal(none.requirementsMatch.fitExplanation, 'No fit score: no requirements were verified.');
