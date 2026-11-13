@@ -141,6 +141,33 @@ test('timeouts abort the provider call and an exhausted budget never reaches the
   assert.equal(calls, 1, 'under one second of budget left: do not start another call');
 });
 
+test('change 5: the log names which validation failed, as a fixed category, and never the content', () => {
+  const quiet = capture('error');
+  try {
+    const cases = [
+      [() => parseModelJson(`not json ${SECRET}`), 'malformed-json'],
+      [() => parseModelJson('[1,2]'), 'malformed-json'],
+      [() => { throw new TruncatedOutputError(); }, 'truncated'],
+      [() => { throw new InvalidModelOutputError('incomplete'); }, 'incomplete'],
+      [() => { throw new InvalidModelOutputError('empty'); }, 'empty'],
+      [() => { throw new InvalidModelOutputError(); }, 'invalid']
+    ];
+    for (const [run, category] of cases) {
+      let error;
+      try { run(); } catch (caught) { error = caught; }
+      assert.equal(error.category, category);
+      quiet.lines.length = 0;
+      respondWithError(res(), error, 'Narrative request');
+      assert.equal(quiet.lines.length, 1);
+      assert.match(quiet.lines[0], new RegExp(`Narrative request failed: ${error.name} \\(${category}\\)$`));
+      assert.doesNotMatch(quiet.lines[0], new RegExp(`${SECRET}|not json`));
+    }
+    quiet.lines.length = 0;
+    respondWithError(res(), new UpstreamError(500), 'Analysis');
+    assert.match(quiet.lines[0], /^Analysis failed: UpstreamError \(upstream status 500\)$/, 'other errors log exactly as before');
+  } finally { quiet.restore(); }
+});
+
 test('every provider failure maps to a safe public response', () => {
   const quiet = capture('error');
   try {
