@@ -159,3 +159,19 @@ test('UI: the requirements line shows both tiers and the explanations never call
   assert.equal(report.requirementsMatchText(report.adaptNovaReport({})), null, 'reports saved before this field exists fall back');
   assert.equal(report.requirementsMatch(report.adaptNovaReport({ requirementsMatch: { required: 'x' } })), null, 'malformed shapes are ignored');
 });
+
+test('change 3, real postings: an application instruction after the Preferred list is not a preferred requirement', () => {
+  const real = require('./fixtures/validation-real-2026-11-13.json');
+  for (const [who, data] of Object.entries(real.cases)) {
+    const lines = preferredSectionLines(data.opportunity);
+    assert.equal(lines.length, 1, `${who}: only the preferred list itself is recovered, got ${JSON.stringify(lines)}`);
+    assert.match(lines[0], /^(?:Docker|AWS)/, who);
+    const instruction = real.recoveredInstructionLines[who];
+    if (instruction) assert.equal(lines.includes(instruction), false, `${who}: "${instruction}" is how to apply, not a requirement`);
+  }
+  // Instruction wording in other shapes, and a genuine preferred line that happens to start with a similar word.
+  const posting = 'Preferred:\n- Docker\n- Sharing knowledge in team demos\nPlease submit your CV and transcript.\nApplications are reviewed weekly.\nHow to apply: email careers@example.com';
+  assert.deepEqual(preferredSectionLines(posting), ['Docker', 'Sharing knowledge in team demos']);
+  assert.deepEqual(preferredSectionLines('Nice to have: Submit pull requests to open-source projects'), ['Submit pull requests to open-source projects'], 'an instruction verb alone does not make a line an application instruction');
+  assert.deepEqual(preferredSectionLines('Nice to have: Submit a portfolio with your application'), [], 'the inline form is filtered the same way');
+});
