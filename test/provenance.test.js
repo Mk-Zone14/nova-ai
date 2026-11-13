@@ -77,6 +77,9 @@ test('documents module: only opportunity-sourced documents are shown as coming f
   assert.match(html, /FROM THE OPPORTUNITY[\s\S]*Transcript[\s\S]*Stated in the opportunity[\s\S]*official transcripts/);
   assert.match(html, /SUGGESTED BY NOVA[\s\S]*Portfolio[\s\S]*Suggested by Nova[\s\S]*Legacy doc/);
   assert.doesNotMatch(html.split('SUGGESTED BY NOVA')[0], /Portfolio|Legacy doc/, 'suggestions never appear under the opportunity heading');
+  // Change 4: an unconfirmed quote lands here too, so the copy must not claim the organiser never asked.
+  assert.match(html, /Nova could not confirm these from the opportunity text\./);
+  assert.doesNotMatch(html, /organiser has not asked/);
   assert.equal(report.documentGroups({ requiredDocuments: [item('A', 'inferred', 'x')] }).fromOpportunity.length, 1);
   assert.equal(report.moduleContent('documents', report.adaptNovaReport({})).subtitle, '0 from the opportunity · 0 suggested');
 });

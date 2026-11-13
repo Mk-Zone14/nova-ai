@@ -383,7 +383,7 @@
       return {
         title: 'Documents',
         subtitle: `${fromOpportunity.length} from the opportunity · ${suggested.length} suggested`,
-        html: `<div class="detail-summary">Only the first group is something the organiser asked for or implied, and each item shows the opportunity text it rests on. The second group is Nova's own suggestion: useful to prepare, but not a requirement.</div><div class="detail-list">${group('FROM THE OPPORTUNITY', 'Stated or implied by the opportunity text.', fromOpportunity, 'No documents were identified in the opportunity text.')}${group('SUGGESTED BY NOVA', 'Recommendations only. The organiser has not asked for these.', suggested, 'No extra documents suggested.')}</div>`
+        html: `<div class="detail-summary">Only the first group was confirmed against the opportunity text, and each item shows the words it rests on. Nova could not confirm the second group from the opportunity text: useful to prepare, but check the posting yourself.</div><div class="detail-list">${group('FROM THE OPPORTUNITY', 'Stated or implied by the opportunity text.', fromOpportunity, 'No documents were identified in the opportunity text.')}${group('SUGGESTED BY NOVA', 'Nova could not confirm these from the opportunity text.', suggested, 'No extra documents suggested.')}</div>`
       };
     }
     if (module === 'risks') {
