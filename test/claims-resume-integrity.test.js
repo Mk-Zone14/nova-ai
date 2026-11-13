@@ -67,7 +67,7 @@ test('change 2: honest ATS suggestions that name the profile\'s own skills, or o
 
 test('change 2: the guard reads only add-type sentences, and only on atsReadiness.suggestions', () => {
   const data = real.cases.kabir;
-  const statement = claims.guardClaims('insights', complete({ atsReadiness: { score: 68, issues: ['Resume does not list Java, Spring Boot or Git'], suggestions: ['Resume does not list Java, Spring Boot or Git'] } }), data.profile, data.opportunity);
+  const statement = claims.guardClaims('insights', complete({ atsReadiness: { score: 68, issues: ['Resume does not list Java, Spring Boot or Git'], suggestions: ['Resume currently omits Java, Spring Boot and Git'] } }), data.profile, data.opportunity);
   assert.deepEqual(statement.diagnostics, [], 'a statement without an add verb is not a suggestion to add');
   const weaknesses = claims.guardClaims('insights', complete({ resumeStrength: { score: 65, highlights: [], weaknesses: ['Add Java, Spring Boot and Git'] } }), data.profile, data.opportunity);
   assert.deepEqual(weaknesses.data.resumeStrength.weaknesses, ['Add Java, Spring Boot and Git'], 'other fields are untouched by this check');
