@@ -72,7 +72,7 @@ async function openReport() {
   await page.waitForSelector('#report:not(.hidden)');
   await page.waitForFunction(() => document.querySelector('#pdfBtn').getAttribute('aria-disabled') !== 'true');
   // The score counts up; wait for it to settle so DOM snapshots are stable.
-  await page.waitForFunction(() => { const score = document.querySelector('#execScore'); return score && score.textContent === score.getAttribute('aria-label'); });
+  await page.waitForFunction(() => { const score = document.querySelector('#execScore'); return score && /^\d+$/.test(score.textContent) && score.getAttribute('aria-label') === `Fit score ${score.textContent} out of 100`; });
   // Count calls into the real html2pdf (pass-through: it still runs the real library).
   await page.evaluate(() => {
     const real = window.html2pdf;

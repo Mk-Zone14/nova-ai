@@ -4,6 +4,7 @@
   --surface: #11161d;
   --surface-strong: #171d25;
   --surface-soft: #0e1319;
+  --field-edge: color-mix(in srgb, var(--ink) 40%, transparent); /* input boundary: 3:1 against page and field (WCAG 1.4.11) */
   --ink: #f1f0eb;
   --muted: #a8afb9;
   --faint: #808a97;
@@ -33,6 +34,7 @@
   --surface: #fbfaf6;
   --surface-strong: #fffefa;
   --surface-soft: #eeeae2;
+  --field-edge: color-mix(in srgb, var(--ink) 52%, transparent);
   --ink: #1d2025;
   --muted: #5d6470;
   --faint: #626870;
@@ -43,7 +45,7 @@
   --accent-ink: #fbfaf6;
   --accent-soft: rgba(84, 109, 165, 0.09);
   --success: #2e7147;
-  --warning: #8a5e26;
+  --warning: #835821;
   --danger: #9d443e;
   --unknown: #58616f;
   --shadow: 0 26px 80px rgba(32, 38, 49, 0.1);
@@ -160,7 +162,7 @@ main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 54px 0 90
 .card-heading label { display: block; font-size: 17px; font-weight: 700; letter-spacing: -0.025em; }
 .card-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
 .character-count { flex: 0 0 auto; padding: 4px 0; color: var(--faint); font-size: 12px; }
-textarea { width: 100%; flex: 1; min-height: 260px; max-height: 70vh; margin-top: 14px; padding: 14px 16px; color: var(--ink); background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--radius-md); resize: vertical; outline: none; line-height: 1.65; transition: border-color var(--transition-fast), background var(--transition-fast); }
+textarea { width: 100%; flex: 1; min-height: 260px; max-height: 70vh; margin-top: 14px; padding: 14px 16px; color: var(--ink); background: var(--surface-soft); border: 1px solid var(--field-edge); border-radius: var(--radius-md); resize: vertical; outline: none; line-height: 1.65; transition: border-color var(--transition-fast), background var(--transition-fast); }
 textarea:hover { border-color: var(--line-strong); }
 textarea:focus { border-color: var(--accent); }
 textarea[aria-invalid="true"] { border-color: var(--danger); }
@@ -203,7 +205,7 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .report { margin-top: 50px; scroll-margin-top: 90px; }
 .report:focus { outline: none; }
 .report-toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
-.report-toolbar h2 { margin: 10px 0 4px; font-family: Newsreader, Georgia, serif; font-size: clamp(32px, 4vw, 50px); font-weight: 500; letter-spacing: -0.06em; line-height: 1; }
+.report-toolbar h1 { margin: 10px 0 4px; font-family: Newsreader, Georgia, serif; font-size: clamp(32px, 4vw, 50px); font-weight: 500; letter-spacing: -0.06em; line-height: 1; }
 .report-toolbar p { margin: 0; color: var(--muted); font-size: 14px; }
 .report-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .report-actions .secondary-button { min-height: 44px; padding: 0 10px; }
@@ -213,7 +215,7 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .decision-main::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--accent); }
 .decision-kicker { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font: 12px "DM Mono"; }
 .decision-title-row { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-top: 28px; }
-.decision-title-row h3 { margin: 0; font-family: Newsreader, Georgia, serif; font-size: clamp(34px, 4.6vw, 58px); font-weight: 500; line-height: 0.95; letter-spacing: -0.065em; }
+.decision-title-row h2 { margin: 0; font-family: Newsreader, Georgia, serif; font-size: clamp(34px, 4.6vw, 58px); font-weight: 500; line-height: 0.95; letter-spacing: -0.065em; }
 .decision-title-row p { max-width: 560px; margin: 14px 0 0; color: var(--muted); font-size: 16px; line-height: 1.55; }
 .primary-score { flex: 0 0 auto; text-align: right; }
 .primary-score strong { display: block; color: var(--accent-strong); font: 500 clamp(46px, 5.6vw, 64px)/0.9 Newsreader, Georgia, serif; letter-spacing: -0.08em; }
@@ -238,7 +240,7 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .report-context strong { margin-top: 7px; font-size: 14px; }
 .report-context span:last-child { margin-top: 3px; color: var(--muted); font-size: 13px; }
 .module-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
-.module-heading h3 { margin: 10px 0 0; font-family: Newsreader, Georgia, serif; font-size: 28px; font-weight: 500; letter-spacing: -0.045em; }
+.module-heading h2 { margin: 10px 0 0; font-family: Newsreader, Georgia, serif; font-size: 28px; font-weight: 500; letter-spacing: -0.045em; }
 .module-heading p { margin: 0; color: var(--muted); font-size: 13px; }
 .module-grid { display: grid; gap: 0; }
 .primary-module-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -270,7 +272,7 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .supplemental-card { padding: 16px 0; border-top: 1px solid var(--line); }
 .report-card-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 13px; border-bottom: 1px solid var(--line); }
 .report-card-title > div { display: inline-flex; align-items: center; gap: 9px; }
-.report-card-title h3 { margin: 0; font-size: 14px; }
+.report-card-title h2 { margin: 0; font-size: 14px; }
 .report-card-title > strong { color: var(--accent-strong); font: 500 23px Newsreader, Georgia, serif; }
 .mini-icon { width: 28px; height: 28px; }
 .mini-icon svg { width: 13px; }
@@ -453,7 +455,7 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 @media (max-width: 760px) { .glance-list { grid-template-columns: 1fr; } .glance-heading { align-items: flex-start; flex-direction: column; } }
 
 .glance-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
-.glance-heading h3 { margin: 10px 0 0; font-family: Newsreader, Georgia, serif; font-size: 28px; font-weight: 500; letter-spacing: -0.045em; }
+.glance-heading h2 { margin: 10px 0 0; font-family: Newsreader, Georgia, serif; font-size: 28px; font-weight: 500; letter-spacing: -0.045em; }
 .pdf-export .glance-heading .secondary-button { display: none !important; }
 .pdf-export .glance-heading { break-after: avoid; page-break-after: avoid; }
 .pdf-export .glance-list li { break-inside: avoid; page-break-inside: avoid; }

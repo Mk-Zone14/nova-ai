@@ -36,11 +36,30 @@ for (const [name, t] of [['dark', dark], ['light', light]]) {
     for (const surface of ['bg', 'surface', 'surface-strong']) assert.ok(contrast(hex(t.accent), hex(t[surface])) >= 4.5, `${name}: --accent on --${surface}`);
   });
   test(`${name} theme: status tags (text on a 13% tint of itself) reach 4.5:1`, () => {
-    for (const status of ['success', 'warning', 'danger', 'unknown']) {
-      const tint = mix(hex(t[status]), hex(t.surface), 0.13);
-      const ratio = contrast(hex(t[status]), tint);
-      assert.ok(ratio >= 4.5, `${name}: ${status} tag is ${ratio.toFixed(2)}:1`);
+    // Tags sit on the page and on cards. (--surface-soft only backs form fields and progress tracks, so tags are not checked there.)
+    for (const surface of ['bg', 'surface', 'surface-strong']) {
+      for (const status of ['success', 'warning', 'danger', 'unknown']) {
+        const tint = mix(hex(t[status]), hex(t[surface]), 0.13);
+        const ratio = contrast(hex(t[status]), tint);
+        assert.ok(ratio >= 4.5, `${name}: ${status} tag on --${surface} is ${ratio.toFixed(2)}:1`);
+      }
     }
+  });
+}
+
+test('light theme: the warning tag reaches 4.5:1 on the darker background axe measured behind it (#e9e1d6)', () => {
+  assert.ok(contrast(hex(light.warning), hex('#e9e1d6')) >= 4.5);
+});
+
+for (const [name, t] of [['dark', dark], ['light', light]]) {
+  test(`${name} theme: the text field boundary reaches 3:1 against the page and the field (WCAG 1.4.11)`, () => {
+    const percent = Number(t['field-edge'].match(/var\(--ink\)\s+(\d+)%/)[1]) / 100;
+    for (const behind of ['bg', 'surface-soft']) {
+      const edge = mix(hex(t.ink), hex(t[behind]), percent);
+      const ratio = contrast(edge, hex(t[behind]));
+      assert.ok(ratio >= 3, `${name}: field edge on --${behind} is ${ratio.toFixed(2)}:1`);
+    }
+    assert.match(css, /textarea \{[^}]*border: 1px solid var\(--field-edge\)/);
   });
 }
 

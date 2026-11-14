@@ -138,7 +138,8 @@ function countTo(element, target, suffix = '', duration = 650) {
     return;
   }
   const finalText = `${target}${suffix}`;
-  element.setAttribute('aria-label', finalText);
+  // role="img" lets the label stand in for the number while it counts up, so a screen reader hears the final score once.
+  element.setAttribute('aria-label', `Fit score ${finalText} out of 100`);
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     element.textContent = finalText;
     return;

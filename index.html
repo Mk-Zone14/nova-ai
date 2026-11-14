@@ -20,7 +20,7 @@
   <header class="site-header">
     <a class="brand" href="#top" aria-label="Nova AI home">
       <span class="brand-mark"><i data-lucide="hexagon"></i></span>
-      <span><b>Nova</b><small>AI</small></span>
+      <span><b>Nova</b> <small>AI</small></span>
     </a>
     <nav class="header-actions" aria-label="Primary navigation">
       <a href="#top" class="nav-link" data-nav="home">Home</a>
@@ -150,7 +150,7 @@
 
     <section class="report hidden" id="report" aria-labelledby="reportTitle" tabindex="-1">
       <div class="report-toolbar">
-        <div><div class="eyebrow"><span class="eyebrow-mark"></span>Fit brief</div><h2 id="reportTitle">Your decision</h2><p id="reportSubtitle">A clear view of your fit and the path forward.</p></div>
+        <div><div class="eyebrow"><span class="eyebrow-mark"></span>Fit brief</div><h1 id="reportTitle">Your decision</h1><p id="reportSubtitle">A clear view of your fit and the path forward.</p></div>
         <div class="report-actions" role="group" aria-label="Report actions">
           <button class="secondary-button" id="editInputsBtn" type="button"><i data-lucide="pencil"></i><span>Edit inputs</span></button>
           <button class="secondary-button" id="copyBtn" type="button"><i data-lucide="copy"></i><span>Copy brief</span></button>
@@ -166,7 +166,7 @@
       <div class="decision-hero">
         <div class="decision-main">
           <div class="decision-kicker"><span class="decision-status" id="decisionStatusDot"></span><span id="decisionKicker">Your decision</span></div>
-          <div class="decision-title-row"><div><h3 id="execVerdict">Assessment pending</h3><span class="why-label mono-label">Why Nova reached this</span><p id="execRecommendation">Your decision-ready overview will appear here.</p></div><div class="primary-score"><strong id="execScore" aria-label="Fit score not available">--</strong><span>FIT SCORE / 100</span></div></div>
+          <div class="decision-title-row"><div><h2 id="execVerdict">Assessment pending</h2><span class="why-label mono-label">Why Nova reached this</span><p id="execRecommendation">Your decision-ready overview will appear here.</p></div><div class="primary-score"><strong id="execScore" role="img" aria-label="Fit score not available">--</strong><span>FIT SCORE / 100</span></div></div>
           <div class="decision-stats"><div><span>Eligibility</span><strong id="decisionEligibility">—</strong></div><div><span>Requirements</span><strong id="decisionRequirements">—</strong></div><div><span>Evidence coverage</span><strong id="decisionConfidence">—</strong></div></div>
           <button class="secondary-button view-analysis-button" id="viewAnalysisBtn" type="button">View evidence <i data-lucide="arrow-down-right"></i></button>
         </div>
@@ -176,12 +176,12 @@
       <div class="report-context"><div><span class="mono-label">Opportunity</span><strong id="contextOpportunity">—</strong><span id="contextOpportunityMeta">—</span></div><div><span class="mono-label">Candidate</span><strong id="contextCandidate">—</strong><span id="contextCandidateMeta">—</span></div><div><span class="mono-label">Readiness</span><strong id="contextReadiness">—</strong><span id="contextReadinessMeta">Based on supplied evidence</span></div></div>
 
       <section class="requirements-glance" id="requirementsGlance" aria-labelledby="glanceTitle">
-        <div class="glance-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Requirements</div><h3 id="glanceTitle">Where you stand on each requirement</h3></div><button class="secondary-button" data-module="requirements" type="button">See the evidence <i data-lucide="arrow-up-right"></i></button></div>
+        <div class="glance-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Requirements</div><h2 id="glanceTitle">Where you stand on each requirement</h2></div><button class="secondary-button" data-module="requirements" type="button">See the evidence <i data-lucide="arrow-up-right"></i></button></div>
         <ul class="glance-list" id="glanceList"></ul>
         <p class="glance-more" id="glanceMore" hidden></p>
       </section>
 
-      <div class="module-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Decision support</div><h3>What matters first</h3></div><p>Decision, evidence, blockers, then next moves.</p></div>
+      <div class="module-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Decision support</div><h2>What matters first</h2></div><p>Decision, evidence, blockers, then next moves.</p></div>
       <div class="module-grid primary-module-grid" id="moduleGrid">
         <button class="analysis-module" data-module="requirements" type="button"><span class="module-icon"><i data-lucide="list-checks"></i></span><span><strong>Evidence</strong><small id="moduleRequirementsMeta">View requirement evidence</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
         <button class="analysis-module" data-module="risks" type="button"><span class="module-icon danger-icon"><i data-lucide="shield-alert"></i></span><span><strong>Blockers</strong><small id="moduleRisksMeta">View risk signals</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
@@ -190,7 +190,7 @@
       </div>
 
       <div class="deep-analysis">
-        <div class="module-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Deeper analysis</div><h3>Open only what you need</h3></div><p>Supporting material stays behind focused modules.</p></div>
+        <div class="module-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Deeper analysis</div><h2>Open only what you need</h2></div><p>Supporting material stays behind focused modules.</p></div>
         <div class="module-grid deep-module-grid" id="deepModuleGrid">
           <button class="analysis-module" data-module="gaps" type="button"><span class="module-icon warning-icon"><i data-lucide="scan-search"></i></span><span><strong>Gaps</strong><small id="moduleGapsMeta">View highest-impact gaps</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
           <button class="analysis-module" data-module="documents" type="button"><span class="module-icon"><i data-lucide="file-check-2"></i></span><span><strong>Documents</strong><small id="moduleDocumentsMeta">View application checklist</small></span><i class="module-arrow" data-lucide="arrow-up-right"></i></button>
@@ -201,8 +201,8 @@
       <details class="preparation-details">
         <summary><span><span class="eyebrow"><span class="eyebrow-mark"></span>Preparation</span><strong>Resume and ATS readiness</strong></span><i data-lucide="chevron-down"></i></summary>
         <div class="supplemental-grid">
-          <article class="supplemental-card"><div class="report-card-title"><div><span class="mini-icon"><i data-lucide="file-text"></i></span><h3>Resume readiness</h3></div><strong id="resumeStrScore">—</strong></div><div class="meter"><span id="resumeStrMeter"></span></div><p id="resumeStrLabel">Independent resume quality assessment.</p><div class="compact-columns"><div><span class="mono-label">HIGHLIGHTS</span><ul id="resumeStrHighlights" class="insight-list"></ul></div><div><span class="mono-label">IMPROVE</span><ul id="resumeStrWeaknesses" class="insight-list negative-list"></ul></div></div></article>
-          <article class="supplemental-card"><div class="report-card-title"><div><span class="mini-icon"><i data-lucide="scan-line"></i></span><h3>ATS readiness</h3></div><strong id="atsScore">—</strong></div><div class="meter"><span id="atsMeter"></span></div><p id="atsLabel">How well your resume performs with automated screening.</p><div class="compact-columns"><div><span class="mono-label">ISSUES</span><ul id="atsIssues" class="insight-list negative-list"></ul></div><div><span class="mono-label">SUGGESTIONS</span><ul id="atsSuggestions" class="insight-list"></ul></div></div></article>
+          <article class="supplemental-card"><div class="report-card-title"><div><span class="mini-icon"><i data-lucide="file-text"></i></span><h2>Resume readiness</h2></div><strong id="resumeStrScore">—</strong></div><div class="meter"><span id="resumeStrMeter"></span></div><p id="resumeStrLabel">Independent resume quality assessment.</p><div class="compact-columns"><div><span class="mono-label">HIGHLIGHTS</span><ul id="resumeStrHighlights" class="insight-list"></ul></div><div><span class="mono-label">IMPROVE</span><ul id="resumeStrWeaknesses" class="insight-list negative-list"></ul></div></div></article>
+          <article class="supplemental-card"><div class="report-card-title"><div><span class="mini-icon"><i data-lucide="scan-line"></i></span><h2>ATS readiness</h2></div><strong id="atsScore">—</strong></div><div class="meter"><span id="atsMeter"></span></div><p id="atsLabel">How well your resume performs with automated screening.</p><div class="compact-columns"><div><span class="mono-label">ISSUES</span><ul id="atsIssues" class="insight-list negative-list"></ul></div><div><span class="mono-label">SUGGESTIONS</span><ul id="atsSuggestions" class="insight-list"></ul></div></div></article>
         </div>
       </details>
     </section>

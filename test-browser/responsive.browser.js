@@ -68,8 +68,8 @@ async function toReport(page) {
 }
 const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 
-test('no screen scrolls the page sideways at any tested width', async () => {
-  for (const size of WIDTHS) {
+test('no screen scrolls the page sideways at any tested width, down to the 320px reflow width', async () => {
+  for (const size of [[320, 640], ...WIDTHS]) {
     const { context, page } = await openReport(size);
     assert.equal(await noHorizontalScroll(page), 0, `landing @${size[0]}`);
     await toReport(page);

@@ -17,4 +17,4 @@ Baseline (master `44fb0a5`): `npm run check` clean, `npm test` 403/403, `npm run
 | U10 | Textareas ~3 lines tall; stacked rules | `.input-card` | High | Taller fields, fewer borders | screenshots | 4 |
 | U11 | Constellation lines cross text on the hero card | canvas | Medium | Quiet zones over text, lower opacity and density, paused off-screen; card no longer moves | screenshots + browser | 6 (done) |
 | U12 | Mobile toolbar wraps, icon-only buttons unlabeled, history remove buttons overflow by 3px | `.report-actions`, history | High | Labelled 2-column action grid, 44px targets, nav keeps current item in view | 5-width browser tests | 7 (done) |
-| U13 | Accessibility not yet audited (keyboard, focus, dialog, contrast) | all | Critical | Audit and fix | axe where available | 8 |
+| U13 | Accessibility not yet audited (keyboard, focus, dialog, contrast) | all | Critical | Audit and fix | axe where available | 8 (done, see ACCESSIBILITY.md) |

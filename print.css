@@ -5,7 +5,7 @@
   main, .report { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
   .report { display: block !important; }
   .report-toolbar { margin-bottom: 18px !important; }
-  .report-toolbar h2, .decision-title-row h3 { color: #111 !important; }
+  .report-toolbar h1, .decision-title-row h2 { color: #111 !important; }
   .report-toolbar p, .decision-title-row p, .report-context span:last-child, .callout p { color: #444 !important; }
   .decision-hero, .report-context { border: 1px solid #bbb !important; box-shadow: none !important; background: #fff !important; }
   .decision-main, .callout, .report-context > div { background: #fff !important; color: #111 !important; }
@@ -21,7 +21,7 @@
   article, .decision-hero, .report-context, .supplemental-card { page-break-inside: avoid; break-inside: avoid; }
   h1, h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
   .glance-heading .secondary-button { display: none !important; }
-  .glance-heading h3 { color: #111 !important; }
+  .glance-heading h2 { color: #111 !important; }
   .glance-list, .glance-list li { border-color: #bbb !important; color: #111 !important; }
   .glance-list li { break-inside: avoid; }
   .glance-list .status-met { color: #16724b !important; background: #e5f2ea !important; }
