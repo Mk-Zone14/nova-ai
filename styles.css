@@ -93,12 +93,11 @@ button.nav-link { background: none; border: 0; font-family: inherit; cursor: poi
 [data-theme="dark"] .theme-toggle span { transform: translateX(22px); }
 main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 54px 0 90px; }
 .hero { position: relative; isolation: isolate; overflow: clip; display: grid; grid-template-columns: minmax(0, 1.04fr) minmax(340px, 0.76fr); gap: clamp(44px, 8vw, 112px); align-items: center; min-height: 600px; padding: 28px 0 95px; }
-.constellation-field { position: fixed; inset: 0; z-index: -1; width: 100vw; height: 100vh; pointer-events: none; opacity: 0.85; mix-blend-mode: screen; }
-[data-theme="light"] .constellation-field { opacity: 0.55; mix-blend-mode: multiply; }
+.constellation-field { position: fixed; inset: 0; z-index: -1; width: 100vw; height: 100vh; pointer-events: none; opacity: 1; mix-blend-mode: screen; }
 .constellation-hint { margin: 18px 0 0; color: var(--muted); font: 12px "DM Mono", ui-monospace, monospace; letter-spacing: 0.02em; pointer-events: none; transition: opacity 600ms var(--ease-out); }
 .constellation-hint[hidden] { display: none; }
 .constellation-hint.is-used { opacity: 0; }
-[data-theme="light"] .constellation-field { opacity: 0.36; mix-blend-mode: multiply; }
+[data-theme="light"] .constellation-field { opacity: 0.95; mix-blend-mode: multiply; }
 .hero-copy { position: relative; z-index: 1; max-width: 650px; }
 .hero h1 { margin: 19px 0 23px; font-family: Newsreader, Georgia, serif; font-size: clamp(57px, 7.6vw, 84px); font-weight: 500; line-height: 0.93; letter-spacing: -0.065em; }
 .hero h1 em { color: var(--accent-strong); font-style: italic; }
@@ -465,7 +464,7 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .pdf-export .glance-heading { break-after: avoid; page-break-after: avoid; }
 .pdf-export .glance-list li { break-inside: avoid; page-break-inside: avoid; }
 
-@media (max-width: 680px) { .constellation-field { opacity: 0.6; } [data-theme="light"] .constellation-field { opacity: 0.4; } }
+@media (max-width: 680px) { .constellation-field { opacity: 0.8; } [data-theme="light"] .constellation-field { opacity: 0.75; } }
 
 /* Phase 7: mobile and responsive refinement. */
 .sample-chip { min-height: 44px; }

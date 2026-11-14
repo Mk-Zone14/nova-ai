@@ -214,21 +214,25 @@ test('the pointer leaves a sparse trail: marks per distance travelled, not per m
 test('the field scrolls with the page (parallax) instead of sitting still behind it', async () => {
   const { context, page } = await open();
   await page.click('#sampleDecisionBtn');
-  // Sample a column of pixels before and after a scroll; a static field would leave the column unchanged apart from drift.
-  const snap = () => page.locator('#constellationField').evaluate((el) => {
-    const ctx = el.getContext('2d');
-    const d = ctx.getImageData(0, 0, el.width, el.height).data;
-    let sum = 0; let n = 0;
-    for (let i = 3; i < d.length; i += 4) { if (d[i] > 40) { sum += Math.floor(i / 4 / el.width); n += 1; } }
-    return n ? sum / n : 0; // mean row of painted pixels
+  // Count painted pixels per row before and after a scroll, then find the vertical shift that lines the two profiles up.
+  // A field fixed to the viewport lines up at 0; one that follows the page lines up at a clear offset.
+  const profile = () => page.locator('#constellationField').evaluate((el) => {
+    const d = el.getContext('2d').getImageData(0, 0, el.width, el.height).data;
+    const rows = new Array(el.height).fill(0);
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 40) rows[Math.floor(i / 4 / el.width)] += 1;
+    return { rows, ratio: el.width / window.innerWidth };
   });
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(120);
-  const before = await snap();
+  await page.waitForTimeout(150);
+  const before = await profile();
   await page.evaluate(() => window.scrollTo(0, 900));
-  await page.waitForTimeout(120);
-  const after = await snap();
-  assert.ok(Math.abs(after - before) > 10, `mean painted row moved only ${(after - before).toFixed(1)}px for a 900px scroll`);
+  await page.waitForTimeout(150);
+  const after = await profile();
+  const overlap = (shift) => { let sum = 0; for (let r = 0; r < before.rows.length; r += 1) { const q = r + shift; if (q >= 0 && q < after.rows.length) sum += Math.min(before.rows[r], after.rows[q]); } return sum; };
+  let best = 0;
+  for (let shift = -200; shift <= 200; shift += 2) if (overlap(shift) > overlap(best)) best = shift;
+  const moved = Math.abs(best) / before.ratio;
+  assert.ok(moved > 10, `field lined up at a ${moved.toFixed(1)}px shift for a 900px scroll`);
   await context.close();
 });
 

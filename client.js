@@ -255,9 +255,10 @@ function setupConstellation() {
   const TRAIL_GAP = 34; // pointer travel between two marks, in px
   const MAX_TRAIL = 60;
   const PARALLAX = 0.12; // how far the field moves per px of page scroll, so it feels attached to the page
+  // Each node carries one of four tones, so the field reads as a spectrum rather than one grey-blue.
   const paletteForTheme = () => document.documentElement.dataset.theme === 'light'
-    ? { node: 'rgba(50, 60, 80, 1)', line: 'rgba(50, 60, 80, 0.58)', hot: '60, 90, 150', active: 'rgba(62, 86, 141, 0.7)' }
-    : { node: 'rgba(205, 218, 242, 1)', line: 'rgba(165, 185, 225, 0.7)', hot: '180, 200, 255', active: 'rgba(209, 220, 242, 0.9)' };
+    ? { tones: ['48, 72, 205', '0, 128, 190', '122, 58, 205', '205, 42, 128'], halo: 0.22 }
+    : { tones: ['140, 165, 255', '96, 224, 255', '190, 146, 255', '255, 140, 208'], halo: 0.3 };
   const nodeCount = () => Math.min(coarse.matches ? 36 : 84, Math.max(22, Math.floor((width * height) / 18000)));
   // Text and cards: static lines and nodes inside these are drawn faintly so the field never competes with copy.
   const QUIET_SELECTOR = '.hero-copy, .sample-decision, .trust-strip, .input-card, .decision-hero, .report-context, .requirements-glance, .module-grid, .supplemental-grid, .preparation-details, .history-card, .loading-panel, .error-card';
@@ -288,9 +289,9 @@ function setupConstellation() {
     const x = Math.floor(p.x / CELL); const y = Math.floor(p.y / CELL);
     return x >= 0 && y >= 0 && x < gridCols && grid[y * gridCols + x] === 1;
   };
-  const QUIET_ALPHA = 0.2;
-  const LIVE_QUIET_ALPHA = 0.55; // interaction stays visible over text, at reduced strength
-  const makeNode = (x, y, extra = {}) => ({ x, y, vx: (Math.random() - 0.5) * 0.035, vy: (Math.random() - 0.5) * 0.035, phase: Math.random() * Math.PI * 2, ox: 0, oy: 0, ovx: 0, ovy: 0, glow: 0, ...extra });
+  const QUIET_ALPHA = 0.3;
+  const LIVE_QUIET_ALPHA = 0.75; // interaction stays visible over text, at reduced strength
+  const makeNode = (x, y, extra = {}) => ({ x, y, vx: (Math.random() - 0.5) * 0.035, vy: (Math.random() - 0.5) * 0.035, phase: Math.random() * Math.PI * 2, ox: 0, oy: 0, ovx: 0, ovy: 0, glow: 0, tone: Math.floor(Math.random() * 4), ...extra });
   const at = (node) => ({ x: node.x + node.ox, y: node.y + node.oy });
 
   function resize() {
@@ -364,12 +365,13 @@ function setupConstellation() {
       const ease = 1 - life * life;
       const y = mark.y - life * 26;
       const calm = inQuiet(mark) ? 0.55 : 1;
-      context.fillStyle = `rgba(${palette.hot}, ${0.75 * ease * calm})`;
+      const tone = palette.tones[mark.phase > 3.14 ? 1 : 0];
+      context.fillStyle = `rgba(${tone}, ${0.95 * ease * calm})`;
       context.beginPath();
       context.arc(mark.x + Math.sin(mark.phase + life * 4) * 3, y, mark.size * (1 - life * 0.5), 0, Math.PI * 2);
       context.fill();
       if (mark.size > 2) {
-        context.strokeStyle = `rgba(${palette.hot}, ${0.35 * ease * calm})`;
+        context.strokeStyle = `rgba(${tone}, ${0.5 * ease * calm})`;
         context.lineWidth = 1;
         context.beginPath();
         context.arc(mark.x, y, mark.size + life * 14, 0, Math.PI * 2);
@@ -399,11 +401,11 @@ function setupConstellation() {
         if (distance > 160) continue;
         const proximity = pointer.active ? Math.max(0, 1 - Math.hypot((a.x + b.x) / 2 - pointer.x, (a.y + b.y) / 2 - pointer.y) / 180) : 0;
         const fade = Math.max(starFade(all[i], time), 0) * Math.max(starFade(all[j], time), 0);
-        context.strokeStyle = proximity > 0.05 ? `rgba(${palette.hot}, ${0.1 + proximity * 0.24})` : palette.line;
-        context.lineWidth = proximity > 0.05 ? 1.6 : 1;
+        context.strokeStyle = `rgba(${palette.tones[all[i].tone]}, ${proximity > 0.05 ? 0.5 + proximity * 0.5 : 0.9})`;
+        context.lineWidth = proximity > 0.05 ? 2.2 : 1.5;
         const calm = inQuiet(a) || inQuiet(b);
         const live = proximity > 0.05 || all[i].born || all[j].born;
-        context.globalAlpha = (calm ? (live ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * fade * (1 - distance / 240);
+        context.globalAlpha = (calm ? (live ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * fade * Math.min(1, 1.25 * (1 - distance / 200));
         context.beginPath();
         context.moveTo(a.x, a.y);
         context.lineTo(b.x, b.y);
@@ -417,8 +419,8 @@ function setupConstellation() {
         .map((entry) => ({ ...entry, d: Math.hypot(entry.p.x - pointer.x, entry.p.y - pointer.y) }))
         .filter((entry) => entry.d < 190).sort((x, y) => x.d - y.d).slice(0, 5);
       near.forEach(({ p, d }) => {
-        context.strokeStyle = `rgba(${palette.hot}, ${0.55 * (1 - d / 190)})`;
-        context.lineWidth = 1.2;
+        context.strokeStyle = `rgba(${palette.tones[0]}, ${0.95 * (1 - d / 190)})`;
+        context.lineWidth = 1.8;
         context.globalAlpha = inQuiet(p) ? LIVE_QUIET_ALPHA : 1;
         context.beginPath();
         context.moveTo(pointer.x, pointer.y);
@@ -430,8 +432,8 @@ function setupConstellation() {
 
     ripples.forEach((ripple) => {
       const age = (time - ripple.born) / RIPPLE_MS;
-      context.strokeStyle = `rgba(${palette.hot}, ${0.42 * (1 - age)})`;
-      context.lineWidth = 1.4;
+      context.strokeStyle = `rgba(${palette.tones[1]}, ${0.8 * (1 - age)})`;
+      context.lineWidth = 2;
       context.beginPath();
       context.arc(ripple.x, ripple.y, age * RIPPLE_REACH, 0, Math.PI * 2);
       context.stroke();
@@ -441,14 +443,33 @@ function setupConstellation() {
       const p = at(node);
       const distance = pointer.active ? Math.hypot(p.x - pointer.x, p.y - pointer.y) : 9999;
       const active = distance < 140 || node.glow > 0.05;
-      context.fillStyle = active ? palette.active : palette.node;
+      const tone = palette.tones[node.tone];
+      const radius = (active ? 4.6 : 2.8) + node.glow * 2.5 + (node.born ? 1.8 : 0);
       context.globalAlpha = (inQuiet(p) ? (active || node.born ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * Math.max(starFade(node, time), 0);
+      if (active || node.born) {
+        // Soft halo: a wide translucent disc under the node, cheaper than shadowBlur.
+        context.fillStyle = `rgba(${tone}, ${palette.halo})`;
+        context.beginPath();
+        context.arc(p.x, p.y, radius * 3.2, 0, Math.PI * 2);
+        context.fill();
+      }
+      context.fillStyle = `rgb(${tone})`;
       context.beginPath();
-      context.arc(p.x, p.y, (active ? 4 : 2.2) + node.glow * 2.5 + (node.born ? 1.6 : 0), 0, Math.PI * 2);
+      context.arc(p.x, p.y, radius, 0, Math.PI * 2);
       context.fill();
     });
     context.globalAlpha = 1;
 
+    if (pointer.active && interactive) {
+      context.fillStyle = `rgba(${palette.tones[0]}, ${palette.halo * 0.7})`;
+      context.beginPath();
+      context.arc(pointer.x, pointer.y, 16, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = `rgb(${palette.tones[0]})`;
+      context.beginPath();
+      context.arc(pointer.x, pointer.y, 3, 0, Math.PI * 2);
+      context.fill();
+    }
     if (interactive) drawTrail(time, palette);
   }
   // The only place a frame is scheduled. Everything else calls render() directly, so a resize or theme change can never start a second loop.
