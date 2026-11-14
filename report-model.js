@@ -283,6 +283,8 @@
       candidate: profile.name || 'Candidate profile', candidateMeta: candidateMeta || notAvailable()
     };
   }
+  // The saved-report label: the opportunity's role once the details exist, otherwise the neutral stand-in the store already uses.
+  function historyTitle(report) { return report?.opportunitySummary?.role || report?.opportunityName || 'Analysis'; }
   // The strip under the report toolbar that separates the finished assessment from the supporting details generated after it.
   function narrativeBanner(status) {
     if (status === 'loading') return { kind: 'loading', text: 'Assessment ready. Generating strengths, gaps, documents and resources…', canRetry: false };
@@ -604,7 +606,7 @@
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
-    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate, reportHeader, narrativeBanner,
+    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate, reportHeader, narrativeBanner, historyTitle,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
     hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,

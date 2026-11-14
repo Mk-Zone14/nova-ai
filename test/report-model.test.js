@@ -557,3 +557,10 @@ test('narrativeBanner distinguishes loading, failure with retry, and nothing to 
   assert.equal(narrativeBanner(undefined), null);
   assert.equal(narrativeBanner('unavailable'), null);
 });
+
+test('historyTitle names a saved report after its opportunity and falls back to the store default', () => {
+  assert.equal(model.historyTitle({ opportunitySummary: { role: 'Data Intern' } }), 'Data Intern');
+  assert.equal(model.historyTitle({ opportunityName: 'Fellowship' }), 'Fellowship');
+  assert.equal(model.historyTitle({}), 'Analysis');
+  assert.equal(model.historyTitle(null), 'Analysis');
+});

@@ -9,7 +9,7 @@ const $$ = (selector) => document.querySelectorAll(selector);
 // Pure report logic lives in report-model.js (loaded before this file) so it can be unit-tested.
 const {
   safe, arr, notAvailable, numberOrNull, adaptNovaReport, friendlyError, list, presentationText,
-  humanizeVerdict, statusCounts, biggestConcern, nextBestAction, reportHeader, narrativeBanner, moduleContent,
+  humanizeVerdict, statusCounts, biggestConcern, nextBestAction, reportHeader, narrativeBanner, historyTitle, moduleContent,
   buildAssessmentPayload, mergeNarrative, hasInsights,
   hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,
   HISTORY_KEY, normalizeHistory, addHistoryEntry, removeHistoryEntry
@@ -158,15 +158,19 @@ function counts() {
   const oc = $('#opportunityCount');
   if (pc) pc.textContent = `${profileInput.value.length.toLocaleString()} / 8,000`;
   if (oc) oc.textContent = `${opportunityInput.value.length.toLocaleString()} / 12,000`;
-  const profileState = $('#profileState');
-  const opportunityState = $('#opportunityState');
-  if (profileState) {
-    profileState.textContent = profileInput.value.trim() ? 'Profile ready' : 'Waiting for profile';
-    profileState.classList.toggle('ready', Boolean(profileInput.value.trim()));
-  }
-  if (opportunityState) {
-    opportunityState.textContent = opportunityInput.value.trim() ? 'Brief ready' : 'Waiting for opportunity';
-    opportunityState.classList.toggle('ready', Boolean(opportunityInput.value.trim()));
+  const MIN_CHARS = 50; // the same minimum runAnalysis enforces
+  const stateText = (value, ready, empty) => {
+    const length = value.trim().length;
+    if (!length) return { text: empty, ready: false };
+    if (length < MIN_CHARS) return { text: `${MIN_CHARS - length} more characters needed`, ready: false };
+    return { text: ready, ready: true };
+  };
+  for (const [selector, field, ready, empty] of [['#profileState', profileInput, 'Profile ready', 'Waiting for profile'], ['#opportunityState', opportunityInput, 'Brief ready', 'Waiting for opportunity']]) {
+    const element = $(selector);
+    if (!element) continue;
+    const state = stateText(field.value, ready, empty);
+    element.textContent = state.text;
+    element.classList.toggle('ready', state.ready);
   }
 }
 
@@ -199,8 +203,6 @@ $$('[data-sample]').forEach((button) => {
     button.closest('details')?.removeAttribute('open');
   });
 });
-$('#sampleProfile')?.addEventListener('click', () => loadSample('profile'));
-$('#sampleOpportunity')?.addEventListener('click', () => loadSample('internship'));
 $('#sampleDecisionBtn')?.addEventListener('click', loadSampleDecision);
 $('#sampleDecisionHero')?.addEventListener('click', loadSampleDecision);
 profileInput?.addEventListener('input', counts);
@@ -434,6 +436,8 @@ $$('.input-card').forEach((card) => {
   card.addEventListener('drop', (event) => {
     event.preventDefault();
     card.classList.remove('drag-over');
+    // A resume only ever belongs in the profile box; dropping it on the opportunity box must not silently replace the profile.
+    if (card.id !== 'profileCard') { if (event.dataTransfer.files?.length) toast('Drop your resume on the profile box. Paste the opportunity text here.'); return; }
     addResumeFile(event.dataTransfer.files?.[0]);
   });
 });
@@ -615,7 +619,7 @@ function writeHistory(entries) {
   else storage.remove(HISTORY_KEY);
 }
 function saveHistory(report) {
-  const title = report?.opportunitySummary?.role || report?.opportunityName || 'Analysis';
+  const title = historyTitle(report);
   const entry = { id: Date.now(), title, score: numberOrNull(report?.overallMatchScore), verdict: humanizeVerdict(report?.eligibilityVerdict || 'Analysis'), timestamp: new Date().toLocaleString(), report };
   writeHistory(addHistoryEntry(historyEntries(), entry, entry.id));
   return entry.id;
@@ -626,7 +630,8 @@ function updateHistory(id, report) {
   const index = entries.findIndex((item) => item.id === id);
   if (index === -1) return; // deleted or expired meanwhile: never resurrect it
   // Spread keeps savedAt/expiresAt: editing an entry does not extend how long it is kept.
-  entries[index] = { ...entries[index], score: numberOrNull(report?.overallMatchScore), report };
+  const title = historyTitle(report);
+  entries[index] = { ...entries[index], ...(title === 'Analysis' ? {} : { title }), score: numberOrNull(report?.overallMatchScore), report };
   writeHistory(entries);
 }
 $('#clearHistory')?.addEventListener('click', () => { storage.remove(HISTORY_KEY); renderHistory(); toast('History cleared from this device.'); });
@@ -750,6 +755,7 @@ async function loadSection(section) {
     window.latestReport = latestReport;
     delete narrative.status[section];
     updateHistory(latestHistoryId, latestReport);
+    renderHistory();
     announce({ insights: 'Analysis details are ready.', coverLetter: 'Cover letter is ready.', interview: 'Interview preparation is ready.' }[section] || 'Section is ready.');
   } catch (error) {
     if (error?.name === 'AbortError' || run !== narrative.runId) return;
@@ -792,6 +798,7 @@ function renderReport(report, { save = false, inputs = null } = {}) {
   $('#errorCard')?.classList.add('hidden');
   if (save && !latestReportSaved) { latestHistoryId = saveHistory(latestReport); latestReportSaved = true; renderHistory(); }
   icons();
+  updateNav();
   if (inputs) { loadSection('insights'); announce('Assessment ready. Supporting details are loading.'); }
   window.requestAnimationFrame(() => $('#report')?.focus({ preventScroll: true }));
 }
@@ -908,11 +915,53 @@ function reset() {
   counts();
   closeDialog();
   showWorkspace();
+  updateNav();
 }
 $$('[data-reset]').forEach((button) => button.addEventListener('click', reset));
 
+// ---- primary navigation: every item performs one action with existing behaviour -----------------
+function showReport() {
+  if (!latestReport) return;
+  document.body.classList.remove('analysis-mode');
+  document.body.classList.add('report-mode');
+  $('#workspace')?.classList.add('hidden');
+  $('#report')?.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.requestAnimationFrame(() => $('#report')?.focus({ preventScroll: true }));
+}
+function updateNav() {
+  const hasReport = Boolean(latestReport) && !abortController;
+  const reportVisible = document.body.classList.contains('report-mode');
+  $$('[data-nav="report"], [data-nav="resources"]').forEach((item) => { item.hidden = !hasReport; });
+  $$('[data-nav]').forEach((item) => {
+    const current = (item.dataset.nav === 'report' && reportVisible) || (item.dataset.nav === 'home' && !reportVisible);
+    if (current) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
+  });
+}
+function focusInput(card, field) {
+  showWorkspace({ scroll: false });
+  $(card)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  field?.focus({ preventScroll: true });
+}
+$$('[data-nav]').forEach((item) => item.addEventListener('click', (event) => {
+  event.preventDefault();
+  if (abortController) { toast('An analysis is running. Cancel it or wait for it to finish first.'); return; }
+  switch (item.dataset.nav) {
+    case 'home': showWorkspace({ scroll: false }); window.scrollTo({ top: 0, behavior: 'smooth' }); break;
+    case 'profile': focusInput('#profileCard', profileInput); break;
+    case 'opportunity': focusInput('#opportunityCard', opportunityInput); break;
+    case 'reports': { const history = $('#history'); if (history) history.open = true; history?.scrollIntoView({ behavior: 'smooth', block: 'start' }); $('#history > summary')?.focus({ preventScroll: true }); break; }
+    case 'report': showReport(); break;
+    case 'resources': openModule('resources'); break;
+    default: break;
+  }
+  updateNav();
+}));
+new MutationObserver(updateNav).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
 icons();
 counts();
+updateNav();
 setupPointerGlow();
 setupConstellation();
 renderHistory();

@@ -23,14 +23,18 @@
       <span><b>Nova</b><small>AI</small></span>
     </a>
     <nav class="header-actions" aria-label="Primary navigation">
-      <a href="#how-it-works" class="nav-link">How it works</a>
-      <a href="#workspace" class="nav-link">Analyze</a>
-      <button class="theme-toggle" id="themeToggle" aria-label="Switch theme" aria-pressed="false">
+      <a href="#top" class="nav-link" data-nav="home">Home</a>
+      <a href="#profileCard" class="nav-link" data-nav="profile">Profile</a>
+      <a href="#opportunityCard" class="nav-link" data-nav="opportunity">Opportunity</a>
+      <a href="#history" class="nav-link" data-nav="reports">My reports</a>
+      <button type="button" class="nav-link" data-nav="report" hidden>Current report</button>
+      <button type="button" class="nav-link" data-nav="resources" hidden>Resources</button>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" aria-label="Switch theme" aria-pressed="false">
         <i data-lucide="sun"></i>
         <i data-lucide="moon"></i>
         <span></span>
       </button>
-    </nav>
   </header>
 
   <main role="main">
@@ -59,9 +63,9 @@
     </section>
 
     <section class="trust-strip" id="how-it-works" aria-label="How Nova AI works">
-      <div><span class="trust-number">01</span><strong>A decision, not a data dump</strong><span>Know where you stand.</span></div>
-      <div><span class="trust-number">02</span><strong>Evidence you can follow</strong><span>See why the model reached it.</span></div>
-      <div><span class="trust-number">03</span><strong>One next move</strong><span>Spend effort where it matters.</span></div>
+      <div><span class="trust-number">01</span><strong>Add your profile</strong><span>Paste your resume or upload a PDF or text file. Nova can only credit skills and projects it can quote from it.</span></div>
+      <div><span class="trust-number">02</span><strong>Paste the opportunity</strong><span>Use the full posting, so Nova can tell hard eligibility rules from nice-to-haves.</span></div>
+      <div><span class="trust-number">03</span><strong>Get your fit brief</strong><span>A verdict, the evidence behind each requirement, your gaps and a next move. Nothing is stored on Nova&rsquo;s server.</span></div>
     </section>
 
     <section class="workspace" id="workspace" aria-labelledby="workspace-title">
@@ -86,7 +90,7 @@
         </details>
       </div>
       <div class="input-grid">
-        <article class="input-card">
+        <article class="input-card" id="profileCard">
           <div class="input-step-line"><span class="step-badge">01</span><span class="input-state" id="profileState">Waiting for profile</span></div>
           <div class="card-heading">
             <div>
@@ -100,12 +104,11 @@
             <div class="footer-actions">
               <label class="text-action" for="resumeUpload"><i data-lucide="upload"></i>Upload resume</label>
               <input id="resumeUpload" type="file" accept=".txt,.md,.pdf,text/plain,application/pdf" hidden>
-              <button class="text-action" id="sampleProfile" type="button">Use sample</button>
             </div>
-            <span>TXT, MD, or PDF · max 2 MB</span>
+            <span>Drop a file here · TXT, MD or PDF · max 2 MB</span>
           </div>
         </article>
-        <article class="input-card">
+        <article class="input-card" id="opportunityCard">
           <div class="input-step-line"><span class="step-badge">02</span><span class="input-state" id="opportunityState">Waiting for opportunity</span></div>
           <div class="card-heading">
             <div>
@@ -116,8 +119,7 @@
           </div>
           <textarea id="opportunityInput" maxlength="12000" aria-describedby="opportunityHelp" placeholder="Paste the full opportunity description."></textarea>
           <div class="input-footer" id="opportunityHelp">
-            <button class="text-action" id="sampleOpportunity" type="button">Use sample</button>
-            <span>Requirements, dates, and documents are mapped automatically.</span>
+            <span>Include the requirements, eligibility rules, deadline and documents. A fuller posting gives a sounder check.</span>
           </div>
         </article>
       </div>
@@ -197,8 +199,8 @@
       </details>
     </section>
     <details class="history-card" id="history">
-      <summary><span><span class="mini-icon"><i data-lucide="clock-3"></i></span><strong>Saved on this device</strong></span><span class="history-summary-action" id="historySummaryAction">View history</span></summary>
-      <div class="history-card-body"><p class="history-notice" id="historyNotice">Saved in this browser only and deleted automatically 30 days after saving. Browser storage is not encrypted: anyone using this browser profile can read these reports. Delete one, or clear all, at any time.</p><button id="clearHistory" class="text-action" type="button">Clear history</button><div id="historyList" class="history-list"><span class="empty">No saved analyses yet.</span></div></div>
+      <summary><span><span class="mini-icon"><i data-lucide="clock-3"></i></span><strong>My reports</strong><small class="history-sub">Saved on this device</small></span><span class="history-summary-action" id="historySummaryAction">View history</span></summary>
+      <div class="history-card-body"><p class="history-notice" id="historyNotice">Saved in this browser only and deleted automatically 30 days after saving. Browser storage is not encrypted: anyone using this browser profile can read these reports. Delete one, or clear all, at any time.</p><div class="history-actions"><button class="text-action" data-reset type="button">Start a new analysis</button><button id="clearHistory" class="text-action" type="button">Clear history</button></div><div id="historyList" class="history-list"><span class="empty">No saved analyses yet.</span></div></div>
     </details>
   </main>
 
