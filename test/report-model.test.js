@@ -215,10 +215,13 @@ test('biggestConcern falls back skill gap -> unknown requirement -> risk -> weak
   assert.equal(biggestConcern(null), 'Not available from Nova.');
 });
 
-test('nextBestAction prefers a resume fix, then recommendations, then the roadmap', () => {
-  assert.equal(nextBestAction({ resumeImprovements: [{ suggested: 'Shipped X' }], personalizedRecommendations: ['R'] }), 'Shipped X');
+test('nextBestAction is an instruction: recommendation, then roadmap, then a resume edit phrased as one', () => {
+  assert.equal(nextBestAction({ resumeImprovements: [{ current: 'Did X', suggested: 'Shipped X' }], personalizedRecommendations: ['R'] }), 'R');
   assert.equal(nextBestAction({ personalizedRecommendations: ['R'] }), 'R');
   assert.equal(nextBestAction({ roadmap: [{ action: 'Read docs' }] }), 'Read docs');
+  assert.equal(nextBestAction({ resumeImprovements: [{ current: 'Did X', suggested: 'Shipped X' }], roadmap: [{ action: 'Read docs' }] }), 'Read docs');
+  assert.equal(nextBestAction({ resumeImprovements: [{ current: 'Did X ', suggested: ' Shipped X' }] }), 'Update your resume: replace “Did X” with “Shipped X”.');
+  assert.equal(nextBestAction({ resumeImprovements: [{ suggested: 'no current text' }, 'junk', { current: 'A', suggested: 'B' }] }), 'Update your resume: replace “A” with “B”.');
   assert.equal(nextBestAction({}), 'Not available from Nova.');
 });
 
@@ -259,8 +262,14 @@ test('learning links: only canonical https URLs ever reach an href, hostile ones
   const report = adapted();
   const html = moduleContent('resources', report).html;
   const hrefs = [...html.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
-  assert.deepEqual(hrefs, ['https://www.coursera.org'], 'only the legitimate Coursera card links out');
-  assert.equal((html.match(/No direct link/g) || []).length, 2, 'javascript: and github.com/attacker cards have no link');
+  assert.deepEqual(hrefs, [
+    'https://kubernetes.io/docs/tutorials/kubernetes-basics/',
+    'https://www.coursera.org/search?query=Testing',
+    'https://docs.python.org/3/tutorial/',
+    'https://git-scm.com/book/en/v2',
+    'https://www.coursera.org/search?query=Go'
+  ], 'gaps first, then model-named skills; every href is a checked page or a labelled search, never the model URL');
+  assert.doesNotMatch(html, /javascript:|github\.com\/attacker|some-invented-path|Hostile|Fuzzy/, 'model titles and URLs never reach the markup');
   assert.match(html, /rel="noopener noreferrer"/);
   assert.match(html, /target="_blank"/);
 });
@@ -274,7 +283,7 @@ test('moduleContent summarises each module with accurate counts', () => {
   assert.equal(moduleContent('gaps', report).subtitle, '2 important gaps');
   assert.equal(moduleContent('documents', report).subtitle, '0 from the opportunity · 3 suggested', 'saved documents without provenance are never presented as required');
   assert.equal(moduleContent('risks', report).subtitle, '2 risk signals');
-  assert.equal(moduleContent('resources', report).subtitle, '3 recommendations', 'junk entries are removed before counting');
+  assert.equal(moduleContent('resources', report).subtitle, '3 checked pages · 2 other', 'one card per gap; junk entries are ignored');
   assert.equal(moduleContent('strategy', report).title, 'Application strategy');
 });
 
@@ -284,7 +293,7 @@ test('moduleContent shows honest empty states for an empty report and a default 
   assert.match(moduleContent('gaps', empty).html, /No high-priority gaps/);
   assert.match(moduleContent('documents', empty).html, /No documents were identified/);
   assert.match(moduleContent('risks', empty).html, /No significant risks/);
-  assert.match(moduleContent('resources', empty).html, /No resources were generated/);
+  assert.match(moduleContent('resources', empty).html, /No skill gaps to find resources for/);
   assert.match(moduleContent('strategy', empty).html, /data-action="generate-cover-letter"/, 'offers to draft rather than claiming none exists');
   assert.equal(moduleContent('nope', empty).title, 'Evidence');
 });
@@ -480,4 +489,21 @@ test('friendlyError describes network failures and keeps hiding provider and con
   assert.equal(friendlyError('Analysis is temporarily unavailable. Please try again later.'), 'Analysis is temporarily unavailable. Please try again later.', 'our own generic messages pass through');
   assert.equal(friendlyError('Nova could not complete the analysis. Please try again.'), 'Nova could not complete the analysis. Please try again.');
   assert.equal(friendlyError("Nova's AI service is busy right now. Please try again in a minute."), "Nova's AI service is busy right now. Please try again in a minute.");
+});
+
+test('real-model regression (Preview, 2026-11-11): the next best action is never a bare rewritten resume bullet', () => {
+  // Two of three consecutive real insights runs put the bullet's new text in the "Next best action" slot.
+  const run2 = {
+    resumeImprovements: [{ section: 'Experience', current: 'Completed a data analysis course', suggested: 'Completed data analysis course', impact: 'Adds analytical foundation' }],
+    personalizedRecommendations: ['Highlight the 40‑user adoption of CampusConnect and the 88.5% model accuracy in your resume'],
+    roadmap: [{ week: 'Week 1', focus: 'Docker fundamentals', action: 'Complete a Docker basics tutorial and build a simple containerized app' }]
+  };
+  assert.equal(nextBestAction(run2), run2.personalizedRecommendations[0]);
+  const run3 = {
+    resumeImprovements: [{ section: 'Experience', current: 'Member of the coding club; helped organise two hackathons', suggested: 'Member of coding club; organized two hackathons' }],
+    roadmap: [{ week: 'Week 1', focus: 'Docker fundamentals', action: 'Watch a Docker basics tutorial, install Docker, and containerise a simple Node.js app' }]
+  };
+  assert.equal(nextBestAction(run3), run3.roadmap[0].action);
+  assert.notEqual(nextBestAction({ resumeImprovements: run3.resumeImprovements }), run3.resumeImprovements[0].suggested);
+  assert.match(nextBestAction({ resumeImprovements: run3.resumeImprovements }), /^Update your resume: replace /);
 });

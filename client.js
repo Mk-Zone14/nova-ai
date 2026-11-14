@@ -669,8 +669,8 @@ function renderInsightPanels() {
     setText('#moduleGapsMeta', `${gaps.length} important gap${gaps.length === 1 ? '' : 's'} · View analysis`);
     setText('#moduleDocumentsMeta', `${documents.fromOpportunity.length} from the opportunity · ${documents.suggested.length} suggested · View checklist`);
     setText('#moduleRisksMeta', `${risks.length} identified · View risks`);
-    const resourceCount = arr(report.learningResources).length;
-    setText('#moduleResourcesMeta', resourceCount ? `${resourceCount} resource${resourceCount === 1 ? '' : 's'} · View links` : 'No resources returned');
+    const resourceCount = NovaResources.resolveResources(report).length;
+    setText('#moduleResourcesMeta', resourceCount ? `${resourceCount} resource${resourceCount === 1 ? '' : 's'} · View links` : 'No skill gaps');
     setText('#moduleStrategyMeta', 'Strategy · Cover letter · Interview prep');
   }
 
@@ -762,8 +762,11 @@ function renderReport(report, { save = false, inputs = null } = {}) {
   setText('#execRecommendation', latestReport.executiveRecommendation || latestReport.verdictReason || latestReport.finalVerdict || 'Your decision-ready overview will appear here.');
   countTo($('#execScore'), fit);
   setText('#decisionEligibility', verdict);
-  setText('#decisionRequirements', countsData.total ? `${countsData.met} / ${countsData.total}` : 'Not mapped');
+  setText('#decisionRequirements', NovaReport.requirementsMatchText(latestReport) || (countsData.total ? `${countsData.met} / ${countsData.total}` : 'Not mapped'));
   setText('#decisionConfidence', confidence === null ? notAvailable() : `${confidence}%`);
+  const match = NovaReport.requirementsMatch(latestReport);
+  $('#decisionRequirements')?.setAttribute('title', match?.fitExplanation || '');
+  $('#decisionConfidence')?.setAttribute('title', match?.evidenceExplanation || 'Share of requirement statuses that rest on a quote verified in your profile. Not confidence in the verdict.');
   setText('#contextReadiness', latestReport.readinessCategory ? presentationText(latestReport.readinessCategory) : (readiness === null ? notAvailable() : `${readiness}% ready`));
   renderInsightPanels();
 

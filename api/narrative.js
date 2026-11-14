@@ -4,6 +4,7 @@ const {
 } = require('../lib/model');
 const { SECTIONS, validateAssessment, sanitizeSection, guardSection } = require('../lib/narrative');
 const { applyProvenance } = require('../lib/provenance');
+const { guardClaims } = require('../lib/claims');
 
 // One model call per request. Keep under maxDuration in vercel.json.
 const BUDGET_MS = 50_000;
@@ -34,25 +35,38 @@ async function handler(req, res) {
         const raw = parseModelJson(await callModel({
             ...config.prompt(texts.profile, texts.opportunity, assessment),
             deadline: Date.now() + BUDGET_MS,
-            maxMs: CALL_MAX_MS
+            maxMs: CALL_MAX_MS,
+            maxCompletionTokens: config.maxCompletionTokens
         }));
         const clean = sanitizeSection(section, raw);
         if (config.complete && !config.complete(clean)) {
             console.warn(`Narrative reply incomplete in ${section}: ${(config.keys.filter((key) => clean[key] === undefined)).length} section(s) missing.`);
-            throw new InvalidModelOutputError();
+            throw new InvalidModelOutputError('incomplete');
         }
         const guarded = guardSection(clean, texts.profile, texts.opportunity, assessment);
         const grounded = applyProvenance(section, guarded.data, texts.opportunity);
-        guarded.data = grounded.data;
-        guarded.removed = [...guarded.removed, ...grounded.removed];
+        const claimed = guardClaims(section, grounded.data, texts.profile, texts.opportunity);
+        guarded.data = claimed.data;
+        guarded.removed = [...guarded.removed, ...grounded.removed, ...claimed.removed];
+        // Preview only: what was withheld, as field + category + single generated token, so guard decisions can be reviewed
+        // against real model output. Returned to the applicant, never logged; production replies never carry it.
+        if (withheldDiagnosticsEnabled(process.env) && guarded.removed.length) {
+            guarded.data = { ...guarded.data, _withheld: [...guarded.diagnostics, ...grounded.diagnostics, ...claimed.diagnostics] };
+        }
         // Log that something was withheld and why, never what (it is the applicant's content).
         if (guarded.removed.length) console.warn(`Narrative guard withheld ${guarded.removed.length} item(s) in ${section}: ${[...new Set(guarded.removed.map((reason) => reason.split(':')[0]))].join('; ')}`);
         const data = guarded.data;
-        if (!config.valid(data)) throw new InvalidModelOutputError();
+        if (!config.valid(data)) throw new InvalidModelOutputError('empty');
         return sendJson(res, 200, { section, data });
     } catch (error) {
         return respondWithError(res, error, 'Narrative request');
     }
 }
 
+// Diagnostics are a review aid for Preview deployments (VERCEL_ENV=preview); production and local runs never attach them.
+function withheldDiagnosticsEnabled(env) {
+    return env.VERCEL_ENV === 'preview';
+}
+
 module.exports = handler;
+module.exports.withheldDiagnosticsEnabled = withheldDiagnosticsEnabled;

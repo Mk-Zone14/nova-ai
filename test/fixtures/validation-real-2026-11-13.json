@@ -1,0 +1,73 @@
+{
+  "about": "Real /api/narrative insights output captured on Vercel Preview build ca1d329 (dpl_49akgHwBbDzo74uXQLrswDepmsMi, openai/gpt-oss-120b via Groq) during end-to-end validation on 2026-11-11 and 2026-11-13, plus the Aarav/Northwind runs from the 2026-11-11 fixture. Each entry records what the model actually wrote and the verdict on it. `atsSuggestions` lists every ATS suggestion returned across the runs; `resumeImprovements` lists every resume rewrite returned. Profiles and postings are the exact inputs.",
+  "cases": {
+    "aarav": {
+      "profile": "Aarav Mehta is a 20-year-old second-year B.Tech Computer Science student at VIT Vellore, India, graduating May 2027. CGPA 8.4/10. Skills: React, Node.js, Python, SQL (basic queries and joins), Git. Projects: CampusConnect, a full-stack web app (React, Node.js, PostgreSQL) used by 40 classmates to share notes; Churn Predictor, a Python scikit-learn model with 88.5% accuracy. Member of the coding club; helped organise two hackathons. Completed a data analysis course. Have not used Excel beyond basics. No experience with cloud platforms or Docker. Available 15 hours per week.",
+      "opportunity": "Software Engineering Intern — Northwind Labs\nLocation: Bengaluru or remote, India | Deadline: 30 September 2026\nEligibility: currently enrolled undergraduate student in India, graduating between May 2027 and December 2027.\nRequired: proficiency in Python or JavaScript; SQL fundamentals; experience building a web application; availability of 15 hours per week.\nPreferred: Docker, cloud deployment (AWS or GCP), Excel or data analysis, teamwork and communication.\nSubmit a resume and a short cover letter.",
+      "atsSuggestions": [
+        { "text": "Add explicit keywords such as Docker, AWS, GCP, JavaScript, Excel, communication in the skills section", "keep": false, "why": "claims skills the profile lacks or never states" },
+        { "text": "Use bullet points with consistent formatting", "keep": true, "why": "formatting advice" },
+        { "text": "Include measurable impact statements where possible", "keep": true, "why": "formatting advice" },
+        { "text": "Add the missing skill keywords to the skills section", "keep": false, "why": "generic add-missing-keywords" },
+        { "text": "Use standard headings (Education, Experience, Projects)", "keep": true, "why": "formatting advice" },
+        { "text": "Save resume as plain text or PDF with selectable text", "keep": true, "why": "formatting advice" },
+        { "text": "Add missing skill keywords to the skills section", "keep": false, "why": "generic add-missing-keywords" },
+        { "text": "Include brief mentions of Docker and cloud exposure in the experience section", "keep": false, "why": "Docker and cloud are stated lacks" },
+        { "text": "Add Excel and communication keywords where relevant", "keep": false, "why": "Excel is a stated lack; communication is only in the posting" }
+      ],
+      "resumeImprovements": [
+        { "current": "Member of the coding club; helped organise two hackathons", "suggested": "Member of coding club; organized two hackathons", "keep": false, "why": "drops 'helped': role inflated" },
+        { "current": "Completed a data analysis course", "suggested": "Completed data analysis course", "keep": true, "why": "honest tightening" }
+      ]
+    },
+    "riya": {
+      "profile": "Riya Nair is a third-year B.Tech Computer Science student at NIT Trichy, India, graduating June 2027. CGPA 9.1/10. Skills: Python, Django, PostgreSQL, Docker, Git, Linux, REST APIs. Experience: Software engineering intern at Finch Labs (summer 2025, 10 weeks) where I built a Django REST service and wrote pytest tests for it. Projects: TicketFlow, a Django and PostgreSQL helpdesk app with Docker Compose, used by 3 student societies; LogSense, a Python log parser with unit tests. Member of the open-source club; contributed two merged pull requests to the python-dateutil project. Available 20 hours per week. Indian citizen.",
+      "opportunity": "Backend Engineering Intern — Finch Labs\nLocation: Chennai or remote, India | Deadline: 15 January 2027\nEligibility: currently enrolled undergraduate student in India, graduating between January 2027 and December 2027. Indian citizenship or valid work authorization in India required.\nRequired: Python; experience with a web framework such as Django or Flask; SQL and a relational database; Git; availability of at least 15 hours per week.\nPreferred: Docker, automated testing with pytest, open-source contributions, Linux.\nSubmit a resume. A short cover letter is optional.",
+      "atsSuggestions": [
+        { "text": "Add a bullet that explicitly lists SQL experience after completing the learning plan", "keep": false, "why": "SQL is only in the posting; the profile never states it" },
+        { "text": "Reformat experience and project sections into concise bullet points with consistent styling", "keep": true, "why": "formatting advice" }
+      ],
+      "resumeImprovements": [
+        { "current": "Software engineering intern at Finch Labs (summer 2025, 10 weeks) where I built a Django REST service and wrote pytest tests for it.", "suggested": "Software engineering intern, Finch Labs (summer 2025, 10 weeks): built Django REST service and authored pytest tests.", "keep": true, "why": "honest tightening; wrote -> authored is neutral" },
+        { "current": "LogSense, a Python log parser with unit tests", "suggested": "LogSense: Python log parser with comprehensive unit tests.", "keep": false, "why": "adds 'comprehensive': scope inflated" }
+      ]
+    },
+    "kabir": {
+      "profile": "Kabir Sen is a second-year B.Tech Computer Science student at Jadavpur University, Kolkata, India, graduating July 2027. CGPA 7.9/10. Skills: C, Python (introductory course), HTML. Projects: a Python tic-tac-toe game; a static HTML personal page. Member of the college quiz club. No experience with Java, Spring, cloud platforms, Docker or Kubernetes. Have not worked on a team software project. Available 12 hours per week.",
+      "opportunity": "Cloud Platform Intern — Orbital Systems\nLocation: Bengaluru, India | Deadline: 28 February 2027\nEligibility: currently enrolled undergraduate student in India, graduating between May 2027 and December 2027.\nRequired: Java; Spring Boot; experience building a web service; Git; availability of 10 hours per week.\nPreferred: AWS or GCP, Docker, Kubernetes, experience working in a team.\nSubmit a resume and a cover letter.",
+      "atsSuggestions": [
+        { "text": "Add a dedicated Skills section listing Java, Spring Boot, Git, REST APIs", "keep": false, "why": "Java and Spring are stated lacks; Git and REST are only in the posting" },
+        { "text": "Use concise bullet points with action verbs", "keep": true, "why": "formatting advice" },
+        { "text": "Ensure consistent font and spacing throughout the resume", "keep": true, "why": "formatting advice" },
+        { "text": "Add a Technical Skills section listing Java, Spring Boot, Git, Docker, AWS/GCP", "keep": false, "why": "stated lacks" },
+        { "text": "Use standard headings (Education, Experience, Projects, Skills) for better parsability", "keep": true, "why": "formatting advice" },
+        { "text": "Include bullet points that start with action verbs and quantify outcomes where possible", "keep": true, "why": "formatting advice" }
+      ],
+      "resumeImprovements": [
+        { "current": "Projects: a Python tic-tac-toe game; a static HTML personal page.", "suggested": "Projects: • Python tic‑tac‑toe game • Static HTML personal page", "keep": true, "why": "honest reformat" },
+        { "current": "Skills: C, Python (introductory course), HTML.", "suggested": "Skills: C, Python, HTML.", "keep": false, "why": "drops 'introductory course': level inflated" },
+        { "current": "Member of the college quiz club.", "suggested": "Extracurricular: Member, college quiz club.", "keep": true, "why": "honest reformat" }
+      ]
+    },
+    "ananya": {
+      "profile": "Ananya Rao is a first-year B.Tech Information Technology student at VIT Chennai, India, graduating May 2029. CGPA 8.7/10. Skills: Python, SQL, Git, Flask. Projects: NoteNest, a Flask and SQLite note-taking app used by 25 classmates; a Python data cleaning script for a college survey. Member of the coding club. Available 15 hours per week.",
+      "opportunity": "Software Engineering Intern — Northwind Labs\nLocation: Bengaluru or remote, India | Deadline: 30 September 2026\nEligibility: currently enrolled undergraduate student in India, graduating between May 2027 and December 2027.\nRequired: proficiency in Python or JavaScript; SQL fundamentals; experience building a web application; availability of 15 hours per week.\nPreferred: Docker, cloud deployment (AWS or GCP), Excel or data analysis, teamwork and communication.\nSubmit a resume and a short cover letter.",
+      "atsSuggestions": [
+        { "text": "Insert the missing technical keywords into the skills section", "keep": false, "why": "generic add-missing-keywords" },
+        { "text": "Add a brief bullet describing any teamwork activities from the coding club", "keep": false, "why": "honest in spirit, but 'teamwork' exists only in the posting; withheld on the safe side (documented limit)" },
+        { "text": "Include a line about familiarity with Docker or cloud platforms if you acquire them", "keep": false, "why": "Docker and cloud are only in the posting" }
+      ],
+      "resumeImprovements": [
+        { "current": "Member of the coding club.", "suggested": "Coding club member.", "keep": true, "why": "honest tightening" },
+        { "current": "Available 15 hours per week.", "suggested": "Available 15 hours/week.", "keep": true, "why": "honest tightening" }
+      ]
+    }
+  },
+  "recoveredInstructionLines": {
+    "about": "preferredSectionLines on each posting recovered this line as a preferred requirement (4 of 4 runs with a trailing one-sentence instruction).",
+    "aarav": "Submit a resume and a short cover letter.",
+    "kabir": "Submit a resume and a cover letter.",
+    "ananya": "Submit a resume and a short cover letter.",
+    "riya": null
+  }
+}

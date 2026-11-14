@@ -180,6 +180,26 @@
       .slice(0, 12)
       .map((item) => ({ label: item.label, value: item.value, project: item.project ?? null }));
   }
+  // Requirements match per tier (required = hard + mandatory; preferred), computed by /api/analyze. Shape-checked.
+  function requirementsMatch(report) {
+    const raw = report?.requirementsMatch;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const tier = (value) => (value && typeof value === 'object' && Number.isInteger(value.total) && Number.isInteger(value.matched) ? value : null);
+    const required = tier(raw.required);
+    const preferred = tier(raw.preferred);
+    if (!required || !preferred) return null;
+    return {
+      required, preferred,
+      fitExplanation: typeof raw.fitExplanation === 'string' ? raw.fitExplanation : '',
+      evidenceExplanation: typeof raw.evidenceExplanation === 'string' ? raw.evidenceExplanation : ''
+    };
+  }
+  function requirementsMatchText(report) {
+    const match = requirementsMatch(report);
+    if (!match) return null;
+    const tierText = (label, tier) => (tier.total ? `${label} ${tier.matched}${tier.partial ? `+${tier.partial} partial` : ''} / ${tier.total}` : `${label} none listed`);
+    return `${tierText('Required', match.required)} · ${tierText('Preferred', match.preferred)}`;
+  }
   function constraintNotes(report) {
     return arr(report?.constraintNotes).filter((note) => note && typeof note.concern === 'string' && typeof note.action === 'string' && note.concern.trim() && note.action.trim());
   }
@@ -211,12 +231,19 @@
     const done = /completed|ready|not[\s_-]*required/i.test(item.status || '');
     return `<article class="detail-item"><div class="detail-item-header"><strong>${safe(item.document || 'Document')}</strong><span class="status-${done ? 'met' : 'unknown'}">${safe(presentationText(item.status, 'Not enough evidence'))}</span></div><small>${label}</small>${quote}</article>`;
   }
+  // The action is an instruction to the applicant. A rewritten resume bullet is not one: real runs showed "Completed data
+  // analysis course" as the next best action, which is the bullet's new text, not what to do. Resume rewrites come last and
+  // are phrased as the edit to make.
   function nextBestAction(report) {
     const constraint = constraintNotes(report)[0];
     if (constraint) return constraint.action;
-    const improvement = arr(report?.resumeImprovements)[0];
-    if (improvement?.suggested) return improvement.suggested;
-    return firstText(report?.personalizedRecommendations, firstText(report?.roadmap?.map((item) => item.action), notAvailable()));
+    const recommendation = firstText(report?.personalizedRecommendations, '');
+    if (recommendation) return recommendation;
+    const roadmap = firstText(arr(report?.roadmap).map((item) => item?.action), '');
+    if (roadmap) return roadmap;
+    const improvement = arr(report?.resumeImprovements).find((item) => item && typeof item.current === 'string' && item.current.trim() && typeof item.suggested === 'string' && item.suggested.trim());
+    if (improvement) return `Update your resume: replace “${improvement.current.trim()}” with “${improvement.suggested.trim()}”.`;
+    return notAvailable();
   }
   function contextCandidate(report) {
     const profile = report?.profileSummary || {};
@@ -231,21 +258,24 @@
     const mandatory = x.mandatory === true ? '<span class="detail-required">Required</span>' : '';
     return `<details class="detail-item"><summary class="detail-item-header"><strong>${requirementText || 'Requirement'}</strong><span class="detail-status-group">${mandatory}<span class="status-${status.key}">${safe(status.label)}</span></span></summary><p><b>Evidence:</b> ${evidence}</p><p><b>Reasoning:</b> ${reasoning}</p><small><b>Confidence:</b> ${confidence}</small></details>`;
   }
+  // A learning-resource card. Accepts a resolved entry from resource-links (kind: verified | search | none) or, for older
+  // callers, a model-style item, of which only the skill name is used: titles and URLs always come from the catalogue.
   function resourceMarkup(resource) {
     if (!resource || typeof resource !== 'object') return '';
-    const skill = String(resource.skill || 'Learning resource');
-    const title = String(resource.resource || resource.skill || 'Resource');
-    const provider = String(resource.provider || '');
-    const type = String(resource.type || '');
-    const duration = String(resource.timeToComplete || '');
-    const resolvedUrl = safeResourceUrl(resource.url, provider || resource.resource);
-    const badge = type ? `<span class="status-unknown resource-type-badge">${safe(type)}</span>` : '';
-    const durationEl = duration ? `<span class="resource-duration">${safe(duration)}</span>` : '';
-    const providerEl = provider ? `<div class="resource-provider">${safe(provider)}</div>` : '';
-    const linkEl = resolvedUrl
-      ? `<a class="resource-open-link" href="${safe(resolvedUrl)}" target="_blank" rel="noopener noreferrer">Open provider site <i data-lucide="arrow-up-right"></i></a>`
-      : `<span class="resource-no-link">No direct link</span>`;
-    return `<article class="resource-card" tabindex="0"><div class="resource-card-top">${badge}${durationEl}</div><div class="resource-card-skill">${safe(skill)}</div><strong class="resource-card-title">${safe(title)}</strong>${providerEl}${resolvedUrl ? '<p class="resource-note">Suggested search. The link opens the provider\'s site, not a verified course page.</p>' : ''}<div class="resource-card-footer">${linkEl}</div></article>`;
+    const entry = typeof resource.kind === 'string' ? resource : linkResolver().resolveResource(resource.skill);
+    if (!entry) return '';
+    const badge = { verified: ['status-met', 'Verified page'], search: ['status-unknown', 'Search results'], none: ['status-unknown', 'No link'] }[entry.kind] || ['status-unknown', 'No link'];
+    const note = {
+      verified: `A page Nova has checked, chosen for this gap. It is the page for the topic, not a homepage.`,
+      search: `Nova has no checked page for this gap, so this opens ${entry.provider} search results for it. Nothing here is a verified course.`,
+      none: 'No learning resource: this is gained through work or projects rather than a course.'
+    }[entry.kind] || '';
+    const typeEl = entry.type ? `<span class="status-unknown resource-type-badge">${safe(entry.type)}</span>` : '';
+    const providerEl = entry.provider ? `<div class="resource-provider">${safe(entry.provider)}</div>` : '';
+    const linkEl = entry.url
+      ? `<a class="resource-open-link" href="${safe(entry.url)}" target="_blank" rel="noopener noreferrer">${entry.kind === 'verified' ? 'Open page' : 'Open search'} <i data-lucide="arrow-up-right"></i></a>`
+      : '<span class="resource-no-link">No direct link</span>';
+    return `<article class="resource-card" tabindex="0"><div class="resource-card-top"><span class="${badge[0]} resource-type-badge">${badge[1]}</span>${typeEl}</div><div class="resource-card-skill">${safe(entry.skill)}</div><strong class="resource-card-title">${safe(entry.title)}</strong>${providerEl}<p class="resource-note">${safe(note)}</p><div class="resource-card-footer">${linkEl}</div></article>`;
   }
 
   // ---- on-demand sections -------------------------------------------------------------------
@@ -299,10 +329,10 @@
     ];
     const coverText = String(report?.coverLetter || '');
     const coverHtml = coverText.split(/\n+/).filter(Boolean).map((para) => `<p>${safe(para)}</p>`).join('');
-    const resources = arr(report?.learningResources);
+    const resources = linkResolver().resolveResources(report);
     const resourcesHtml = resources.length
       ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>`
-      : '<span class="empty">No learning resources were generated.</span>';
+      : '<span class="empty">No skill gaps to find resources for.</span>';
     const questions = arr(report?.interviewQuestions).filter((item) => item && typeof item === 'object');
 
     const cover = draftSection({
@@ -334,7 +364,9 @@
   function baseModuleContent(module, report, state) {
     const counts = statusCounts(report);
     if (module === 'requirements') {
-      return { title: 'Requirements', subtitle: `${counts.met} of ${counts.total || 0} mapped requirements matched`, html: `<div class="detail-summary">Each item connects the opportunity requirement to the evidence Nova found in the supplied profile.</div><div class="detail-list">${counts.items.length ? counts.items.map(detailRequirement).join('') : '<span class="empty">No requirements were identified.</span>'}</div>` };
+      const match = requirementsMatch(report);
+      const matchHtml = match ? `<div class="detail-summary"><b>Requirements match:</b> ${safe(requirementsMatchText(report))}. Eligibility depends only on the hard requirements; this count covers every listed requirement.${match.fitExplanation ? `<br><b>Fit score:</b> ${safe(match.fitExplanation)}` : ''}${match.evidenceExplanation ? `<br><b>Evidence coverage:</b> ${safe(match.evidenceExplanation)}` : ''}</div>` : '';
+      return { title: 'Requirements', subtitle: `${counts.met} of ${counts.total || 0} mapped requirements matched`, html: `<div class="detail-summary">Each item connects the opportunity requirement to the evidence Nova found in the supplied profile.</div>${matchHtml}<div class="detail-list">${counts.items.length ? counts.items.map(detailRequirement).join('') : '<span class="empty">No requirements were identified.</span>'}</div>` };
     }
     if (module === 'strengths') {
       const strengths = arr(report?.strengths);
@@ -351,7 +383,7 @@
       return {
         title: 'Documents',
         subtitle: `${fromOpportunity.length} from the opportunity · ${suggested.length} suggested`,
-        html: `<div class="detail-summary">Only the first group is something the organiser asked for or implied, and each item shows the opportunity text it rests on. The second group is Nova's own suggestion: useful to prepare, but not a requirement.</div><div class="detail-list">${group('FROM THE OPPORTUNITY', 'Stated or implied by the opportunity text.', fromOpportunity, 'No documents were identified in the opportunity text.')}${group('SUGGESTED BY NOVA', 'Recommendations only. The organiser has not asked for these.', suggested, 'No extra documents suggested.')}</div>`
+        html: `<div class="detail-summary">Only the first group was confirmed against the opportunity text, and each item shows the words it rests on. Nova could not confirm the second group from the opportunity text: useful to prepare, but check the posting yourself.</div><div class="detail-list">${group('FROM THE OPPORTUNITY', 'Stated or implied by the opportunity text.', fromOpportunity, 'No documents were identified in the opportunity text.')}${group('SUGGESTED BY NOVA', 'Nova could not confirm these from the opportunity text.', suggested, 'No extra documents suggested.')}</div>`
       };
     }
     if (module === 'risks') {
@@ -362,8 +394,9 @@
       return { title: 'Application strategy', subtitle: 'A concise path forward', html: strategyMarkup(report, state) };
     }
     if (module === 'resources') {
-      const resources = arr(report?.learningResources);
-      return { title: 'Learning resources', subtitle: `${resources.length} recommendation${resources.length === 1 ? '' : 's'}`, html: `<div class="detail-summary">Click a card to open the resource in a new tab. Resources are matched to the skill gaps in your profile.</div>${resources.length ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>` : '<span class="empty">No resources were generated.</span>'}` };
+      const resources = linkResolver().resolveResources(report);
+      const verified = resources.filter((item) => item.kind === 'verified').length;
+      return { title: 'Learning resources', subtitle: `${verified} checked page${verified === 1 ? '' : 's'} · ${resources.length - verified} other`, html: `<div class="detail-summary">One resource per skill gap. "Verified page" links go to a page Nova has checked for that topic; "Search results" links open a provider search when Nova has no checked page; nothing is generated by the model.</div>${resources.length ? `<div class="resources-scroller" role="list" aria-label="Learning resources">${resources.map(resourceMarkup).join('')}</div>` : '<span class="empty">No skill gaps to find resources for.</span>'}` };
     }
     return { title: 'Evidence', subtitle: 'Focused details from your fit brief', html: '<span class="empty">No details are available for this module.</span>' };
   }
@@ -407,7 +440,8 @@
       `Organization: ${report.opportunitySummary?.organization || ''}`,
       `Fit score: ${numberOrNull(report.overallMatchScore) === null ? notAvailable() : `${numberOrNull(report.overallMatchScore)}/100`}`,
       `Verdict: ${humanizeVerdict(report.eligibilityVerdict || '')}`,
-      `Requirements: ${countsData.met}/${countsData.total || 0} matched`,
+      `Requirements: ${countsData.met}/${countsData.total || 0} matched${requirementsMatchText(report) ? ` (${requirementsMatchText(report)})` : ''}`,
+      `Evidence coverage: ${numberOrNull(report.evidenceCoverage ?? report.confidenceScore) === null ? notAvailable() : `${numberOrNull(report.evidenceCoverage ?? report.confidenceScore)}% of requirement statuses rest on a verified profile quote (not confidence in the verdict)`}`,
       `Readiness: ${report.readinessCategory || (numberOrNull(report.applicationReadiness) === null ? notAvailable() : `${numberOrNull(report.applicationReadiness)}%`)}`,
       '',
       'WHY THIS VERDICT',
@@ -530,7 +564,7 @@
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
-    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, contextCandidate,
+    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
     hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,

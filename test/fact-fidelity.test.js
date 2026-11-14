@@ -79,8 +79,8 @@ test('figures: ordinary writing is not flagged (years, durations, small counts, 
 test('narrative handler: a rewritten metric is withheld from every section, exact metrics survive (production regression)', async () => {
   const reply = () => complete({
     resumeImprovements: [
-      { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default-risk classifier (ROC-AUC 0.7744, 79% accuracy)', impact: 'High' },
-      { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default-risk classifier (ROC-AUC 0.7738, accuracy 79.4%)', impact: 'High' }
+      { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default risk classifier (ROC-AUC 0.7744, 79% accuracy)', impact: 'High' },
+      { section: 'Projects', current: 'Credit Card Default Prediction', suggested: 'Built a default risk classifier (ROC-AUC 0.7738, accuracy 79.4%)', impact: 'High' }
     ],
     personalizedRecommendations: ['Lead with the ROC-AUC of 0.7744 in applications', 'Learn Excel modelling for 10 hours'],
     strengths: ['Project accuracy 79.4%', 'Project accuracy of roughly 79%'],
@@ -89,7 +89,7 @@ test('narrative handler: a rewritten metric is withheld from every section, exac
   const { res, warnings } = await runNarrative('insights', reply);
   assert.equal(res.statusCode, 200);
   const data = res.body.data;
-  assert.deepEqual(data.resumeImprovements.map((item) => item.suggested), ['Built a default-risk classifier (ROC-AUC 0.7738, accuracy 79.4%)']);
+  assert.deepEqual(data.resumeImprovements.map((item) => item.suggested), ['Built a default risk classifier (ROC-AUC 0.7738, accuracy 79.4%)']);
   assert.deepEqual(data.personalizedRecommendations, ['Learn Excel modelling for 10 hours']);
   assert.deepEqual(data.strengths, ['Project accuracy 79.4%']);
   assert.deepEqual(data.profileSummary, { cgpa: '8.83/10', projects: ['Credit Card Default Prediction (ROC-AUC 0.7738)'] });
@@ -287,32 +287,32 @@ test('analyze: the audited candidate gets a Not eligible verdict plus determinis
 
 test('report model: model-written advice never outranks a verified constraint; reports without notes behave as before', () => {
   const withModelAdvice = { resumeImprovements: [{ suggested: 'Model rewrite 0.7744' }], personalizedRecommendations: ['Target Summer 2028'], missingSkills: [{ skill: 'Excel', whyItMatters: 'x' }] };
-  assert.equal(model.nextBestAction(withModelAdvice), 'Model rewrite 0.7744', 'unchanged when there are no constraint notes');
+  assert.equal(model.nextBestAction(withModelAdvice), 'Target Summer 2028', 'with no constraint notes the first recommendation is the action (a resume rewrite is never shown as one)');
   assert.equal(model.biggestConcern(withModelAdvice), 'Excel — x');
   const withNote = { ...withModelAdvice, constraintNotes: [{ concern: 'Hard failure', action: 'Confirm with the organiser.' }] };
   assert.equal(model.nextBestAction(withNote), 'Confirm with the organiser.');
   assert.equal(model.biggestConcern(withNote), 'Hard failure');
   const malformed = { ...withModelAdvice, constraintNotes: [null, 'text', { concern: 5, action: 'x' }, { concern: '', action: 'x' }] };
-  assert.equal(model.nextBestAction(malformed), 'Model rewrite 0.7744', 'malformed notes are ignored, never shown');
+  assert.equal(model.nextBestAction(malformed), 'Target Summer 2028', 'malformed notes are ignored, never shown');
   assert.deepEqual(model.adaptNovaReport({ response: { constraintNotes: [null, { concern: 'a', action: 'b' }, { concern: 1 }] } }).constraintNotes, [{ concern: 'a', action: 'b' }]);
 });
 
 // ---- 4. learning resources --------------------------------------------------------------------------------------------
 
-test('resources: a provider-site link is labelled as one and is not presented as a course link', () => {
+test('resources: a model-invented course title and URL are never shown; a gap with no checked page gets a labelled search link', () => {
   const html = model.resourceMarkup({ skill: 'Excel', resource: 'Financial Modelling Course', provider: 'Coursera', url: 'https://www.coursera.org/learn/some-invented-course', type: 'Course', timeToComplete: '10 hours' });
-  assert.match(html, /href="https:\/\/www\.coursera\.org"/, 'the invented course path is still discarded');
-  assert.match(html, /Open provider site/);
-  assert.match(html, /Suggested search\. The link opens the provider's site, not a verified course page\./);
-  assert.doesNotMatch(html, /Open resource/);
-  assert.match(html, /Financial Modelling Course/, 'the suggested title stays visible as the thing to search for');
+  assert.doesNotMatch(html, /Financial Modelling Course|some-invented-course/, 'nothing the model wrote reaches the card');
+  assert.match(html, /href="https:\/\/www\.coursera\.org\/search\?query=Excel"/, 'a search for the gap, not a homepage and not an invented course page');
+  assert.match(html, /Search results/);
+  assert.match(html, /Nothing here is a verified course/);
+  assert.doesNotMatch(html, /Verified page|Open provider site/);
 });
 
-test('resources: with no resolvable link, no link and no claim about one is shown', () => {
-  const html = model.resourceMarkup({ skill: 'Excel', resource: 'Course', provider: 'Udemy', url: 'https://udemy.com/course/x', type: 'Course' });
+test('resources: a gap gained through work rather than a course gets no link and no claim about one', () => {
+  const html = model.resourceMarkup({ skill: 'Prior internship experience', resource: 'Course', provider: 'Udemy', url: 'https://udemy.com/course/x', type: 'Course' });
   assert.match(html, /No direct link/);
   assert.doesNotMatch(html, /<a /);
-  assert.doesNotMatch(html, /Suggested search/);
+  assert.doesNotMatch(html, /Search results|Verified page|udemy/);
 });
 
 test('resources: the insights prompt asks for suggested searches on provider base URLs and forbids invented course paths', () => {
