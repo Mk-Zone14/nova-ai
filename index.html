@@ -43,17 +43,18 @@
         <div class="hero-notes"><span>Profile + opportunity</span><span>Evidence-led</span><span>Human-readable</span></div>
         <div class="hero-actions">
           <a class="hero-cta" href="#workspace">Build my fit brief <i data-lucide="arrow-down-right"></i></a>
-          <a class="hero-secondary" href="#sample-decision">See a sample decision <i data-lucide="arrow-up-right"></i></a>
+          <a class="hero-secondary" href="#sample-decision">See an example brief <i data-lucide="arrow-up-right"></i></a>
         </div>
       </div>
-      <aside class="sample-decision" id="sample-decision" aria-label="Sample Nova AI decision" data-pointer-card>
-        <div class="sample-decision-top"><span class="mono-label">Live sample / Fit brief</span><span class="status-dot"></span></div>
+      <aside class="sample-decision" id="sample-decision" aria-label="Illustrative example of a Nova AI fit brief" data-pointer-card>
+        <div class="sample-decision-top"><span class="mono-label">Illustrative example</span><span class="sample-badge">Not a real analysis</span></div>
         <div class="sample-decision-title"><span>Product Engineering Intern</span><span class="sample-score">82</span></div>
         <span class="sample-organization">Atlas Labs · Bengaluru / Remote</span>
-        <div class="sample-decision-verdict"><strong>Apply with a plan</strong><span>Fit score</span></div>
+        <div class="sample-decision-verdict"><strong>Apply with a plan</strong><span>Example score</span></div>
         <p>Strong product experience supports the application. The open question is clearer SQL evidence before submitting.</p>
         <div class="sample-evidence"><span><b>Evidence</b> SQL · React · shipped project</span><span><b>Next move</b> Verify deployment experience</span></div>
-        <button class="sample-link" id="sampleDecisionHero" type="button">Use this example <i data-lucide="arrow-right"></i></button>
+        <p class="sample-disclaimer">A mock-up of the report layout. Nova scores your own profile against the real opportunity text, so results will differ.</p>
+        <button class="sample-link" id="sampleDecisionHero" type="button">Load the sample inputs <i data-lucide="arrow-right"></i></button>
       </aside>
     </section>
 
@@ -72,7 +73,7 @@
         <p>Give Nova the evidence it needs to investigate your fit. Your inputs stay in this browser until you choose to analyze.</p>
       </div>
       <div class="sample-tools" role="group" aria-label="Sample data">
-        <button class="sample-primary" id="sampleDecisionBtn" type="button">See a sample decision <i data-lucide="sparkles"></i></button>
+        <button class="sample-primary" id="sampleDecisionBtn" type="button">Load sample inputs <i data-lucide="sparkles"></i></button>
         <details class="sample-menu">
           <summary class="sample-menu-trigger">Choose another sample <i data-lucide="chevron-down"></i></summary>
           <div class="sample-menu-panel">
@@ -155,6 +156,8 @@
           <button class="secondary-button reset" data-reset type="button"><i data-lucide="rotate-ccw"></i><span class="action-wide">New analysis</span></button>
         </div>
       </div>
+
+      <div class="narrative-banner hidden" id="narrativeBanner"><span class="narrative-banner-dot" aria-hidden="true"></span><span id="narrativeBannerText"></span><button class="text-action" id="narrativeRetry" type="button" hidden>Try again</button></div>
 
       <div class="decision-hero">
         <div class="decision-main">

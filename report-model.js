@@ -249,6 +249,46 @@
     const profile = report?.profileSummary || {};
     return { name: profile.name || 'Candidate profile', meta: [profile.degree, profile.university].filter(Boolean).join(' · ') || notAvailable() };
   }
+  // What the report header and context row say about the opportunity and candidate. The role and organisation arrive with the
+  // supporting details (the second request), so until then the header must say that it is still reading them instead of
+  // showing a generic stand-in that later changes identity. `status` is the supporting-details state: 'loading', 'error',
+  // 'unavailable' (restored from history without details) or undefined (ready).
+  function reportHeader(report, status) {
+    const role = report?.opportunitySummary?.role || report?.opportunityName || '';
+    const organization = report?.opportunitySummary?.organization || '';
+    const deadline = report?.opportunitySummary?.deadline || '';
+    const profile = report?.profileSummary || {};
+    const candidateMeta = [profile.degree, profile.university].filter(Boolean).join(' · ');
+    const pending = status === 'loading' && !role;
+    const missing = (status === 'error' || status === 'unavailable') && !role;
+    if (pending) {
+      return {
+        pending: true, title: 'Reading opportunity details…', subtitle: 'Your assessment is ready. The opportunity and candidate details are still loading.',
+        opportunity: 'Reading opportunity details…', opportunityMeta: 'Loading…',
+        candidate: profile.name || 'Loading candidate information…', candidateMeta: profile.name ? (candidateMeta || notAvailable()) : 'Loading…'
+      };
+    }
+    if (missing) {
+      return {
+        pending: false, title: 'Fit brief', subtitle: 'Opportunity details are not available for this report.',
+        opportunity: 'Opportunity details unavailable', opportunityMeta: 'Not saved with this analysis',
+        candidate: profile.name || 'Candidate details unavailable', candidateMeta: candidateMeta || 'Not saved with this analysis'
+      };
+    }
+    const name = role || 'Eligibility assessment';
+    const org = organization || 'Opportunity';
+    return {
+      pending: false, title: name, subtitle: `${org} · evidence-based candidate analysis`,
+      opportunity: name, opportunityMeta: [organization || 'Opportunity', deadline].filter(Boolean).join(' · ') || 'Opportunity brief analyzed',
+      candidate: profile.name || 'Candidate profile', candidateMeta: candidateMeta || notAvailable()
+    };
+  }
+  // The strip under the report toolbar that separates the finished assessment from the supporting details generated after it.
+  function narrativeBanner(status) {
+    if (status === 'loading') return { kind: 'loading', text: 'Assessment ready. Generating strengths, gaps, documents and resources…', canRetry: false };
+    if (status === 'error') return { kind: 'error', text: 'The supporting details could not be prepared. Your assessment above is unaffected.', canRetry: true };
+    return null;
+  }
   function detailRequirement(x) {
     const status = normalizeStatus(x.status);
     const requirementText = safe(x.requirement);
@@ -564,7 +604,7 @@
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
-    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate,
+    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate, reportHeader, narrativeBanner,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
     hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,

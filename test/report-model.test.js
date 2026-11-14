@@ -507,3 +507,53 @@ test('real-model regression (Preview, 2026-11-11): the next best action is never
   assert.notEqual(nextBestAction({ resumeImprovements: run3.resumeImprovements }), run3.resumeImprovements[0].suggested);
   assert.match(nextBestAction({ resumeImprovements: run3.resumeImprovements }), /^Update your resume: replace /);
 });
+
+// ---- Phase 1: report header and narrative banner never present a loading stand-in as final information ----------------
+const { reportHeader, narrativeBanner, notAvailable } = model;
+
+test('reportHeader says it is still reading while the supporting details load', () => {
+  const header = reportHeader({ eligibilityVerdict: 'Eligible' }, 'loading');
+  assert.equal(header.pending, true);
+  assert.match(header.title, /Reading opportunity details/);
+  assert.match(header.candidate, /Loading candidate information/);
+  assert.doesNotMatch(JSON.stringify(header), /Eligibility assessment|Candidate profile|Not available from Nova/);
+});
+
+test('reportHeader uses real names as soon as they exist, even while other sections still load', () => {
+  const report = { opportunitySummary: { role: 'Product Engineering Intern', organization: 'Atlas Labs', deadline: '30 Sep 2026' }, profileSummary: { name: 'Priya Sharma', degree: 'B.Tech CSE', university: 'DTU' } };
+  for (const status of ['loading', undefined]) {
+    const header = reportHeader(report, status);
+    assert.equal(header.pending, false);
+    assert.equal(header.title, 'Product Engineering Intern');
+    assert.equal(header.opportunityMeta, 'Atlas Labs · 30 Sep 2026');
+    assert.equal(header.candidate, 'Priya Sharma');
+    assert.equal(header.candidateMeta, 'B.Tech CSE · DTU');
+  }
+});
+
+test('reportHeader is final and honest when the details failed or were never saved', () => {
+  for (const status of ['error', 'unavailable']) {
+    const header = reportHeader({}, status);
+    assert.equal(header.pending, false);
+    assert.equal(header.title, 'Fit brief');
+    assert.match(header.opportunity, /unavailable/);
+    assert.doesNotMatch(JSON.stringify(header), /Reading|Loading/);
+  }
+});
+
+test('reportHeader keeps its previous wording once the details are ready but a field is missing', () => {
+  const header = reportHeader({ opportunitySummary: {}, profileSummary: {} }, undefined);
+  assert.equal(header.title, 'Eligibility assessment');
+  assert.equal(header.candidate, 'Candidate profile');
+  assert.equal(header.candidateMeta, notAvailable());
+});
+
+test('narrativeBanner distinguishes loading, failure with retry, and nothing to say', () => {
+  assert.equal(narrativeBanner('loading').canRetry, false);
+  assert.match(narrativeBanner('loading').text, /Assessment ready/);
+  const failed = narrativeBanner('error');
+  assert.equal(failed.canRetry, true);
+  assert.match(failed.text, /assessment above is unaffected/);
+  assert.equal(narrativeBanner(undefined), null);
+  assert.equal(narrativeBanner('unavailable'), null);
+});

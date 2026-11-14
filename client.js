@@ -9,7 +9,7 @@ const $$ = (selector) => document.querySelectorAll(selector);
 // Pure report logic lives in report-model.js (loaded before this file) so it can be unit-tested.
 const {
   safe, arr, notAvailable, numberOrNull, adaptNovaReport, friendlyError, list, presentationText,
-  humanizeVerdict, statusCounts, biggestConcern, nextBestAction, contextCandidate, moduleContent,
+  humanizeVerdict, statusCounts, biggestConcern, nextBestAction, reportHeader, narrativeBanner, moduleContent,
   buildAssessmentPayload, mergeNarrative, hasInsights,
   hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,
   HISTORY_KEY, normalizeHistory, addHistoryEntry, removeHistoryEntry
@@ -190,7 +190,7 @@ function loadSampleDecision() {
   loadSample('profile', { announce: false });
   loadSample('internship', { announce: false });
   $('#workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  toast('Sample decision loaded.');
+  toast('Sample profile and opportunity loaded. Review them, then build the brief.');
 }
 
 $$('[data-sample]').forEach((button) => {
@@ -494,9 +494,10 @@ async function runAnalysis() {
   latestReportSaved = false;
   latestHistoryId = null;
   startLoading();
-  abortController = new AbortController();
+  const controller = new AbortController();
+  abortController = controller;
   try {
-    const data = await postJson('/api/analyze', { profile, opportunity }, { signal: abortController.signal, timeoutMs: ANALYZE_TIMEOUT_MS });
+    const data = await postJson('/api/analyze', { profile, opportunity }, { signal: controller.signal, timeoutMs: ANALYZE_TIMEOUT_MS });
     if (!data?.response) throw new UserFacingError('The analysis returned no result. Please try again.');
     renderReport(adaptNovaReport(data), { save: true, inputs: { profile, opportunity } });
   } catch (error) {
@@ -509,12 +510,16 @@ async function runAnalysis() {
     $('#errorCard')?.classList.remove('hidden');
     window.requestAnimationFrame(() => $('#errorTitle')?.focus({ preventScroll: true }));
   } finally {
-    abortController = null;
-    stopLoading();
+    // A cancelled run has already been cleaned up; it must not tear down a newer analysis that started after the cancel.
+    if (abortController === controller) {
+      abortController = null;
+      stopLoading();
+    }
   }
 }
 $('#analyzeBtn')?.addEventListener('click', runAnalysis);
 $('#retryBtn')?.addEventListener('click', runAnalysis);
+$('#narrativeRetry')?.addEventListener('click', () => loadSection('insights'));
 $('#cancelLoading')?.addEventListener('click', () => {
   abortController?.abort();
   abortController = null;
@@ -639,25 +644,35 @@ function uiState() {
   if (!state.insights && latestReport && !hasInsights(latestReport)) state.insights = narrative.inputs ? 'loading' : 'unavailable';
   return state;
 }
+function renderNarrativeBanner(status) {
+  const banner = $('#narrativeBanner');
+  if (!banner) return;
+  const state = narrativeBanner(status);
+  banner.classList.toggle('hidden', !state);
+  banner.dataset.kind = state?.kind || '';
+  setText('#narrativeBannerText', state?.text || '');
+  const retry = $('#narrativeRetry');
+  if (retry) retry.hidden = !state?.canRetry;
+}
 function renderInsightPanels() {
   const report = latestReport || {};
-  const candidate = contextCandidate(report);
-  const role = report.opportunitySummary?.role || report.opportunityName || 'Eligibility assessment';
-  const organization = report.opportunitySummary?.organization || 'Opportunity';
-  setText('#reportTitle', role);
-  setText('#reportSubtitle', `${organization} · evidence-based candidate analysis`);
-  setText('#contextOpportunity', role);
-  setText('#contextOpportunityMeta', [organization, report.opportunitySummary?.deadline].filter(Boolean).join(' · ') || 'Opportunity brief analyzed');
-  setText('#contextCandidate', candidate.name);
-  setText('#contextCandidateMeta', candidate.meta);
-  const pending = ['loading', 'error', 'unavailable'].includes(uiState().insights);
   const status = uiState().insights;
+  const header = reportHeader(report, status);
+  setText('#reportTitle', header.title);
+  setText('#reportSubtitle', header.subtitle);
+  setText('#contextOpportunity', header.opportunity);
+  setText('#contextOpportunityMeta', header.opportunityMeta);
+  setText('#contextCandidate', header.candidate);
+  setText('#contextCandidateMeta', header.candidateMeta);
+  $('#report')?.classList.toggle('details-pending', status === 'loading');
+  renderNarrativeBanner(status);
+  const pending = ['loading', 'error', 'unavailable'].includes(status);
   const countsData = statusCounts(report);
   const strengths = arr(report.strengths);
   const gaps = arr(report.missingSkills);
   const risks = arr(report.riskAnalysis);
   const documents = NovaReport.documentGroups(report);
-  const waiting = { loading: 'Preparing…', error: 'Could not be prepared · Open to retry', unavailable: 'Not saved with this analysis' }[status];
+  const waiting = { loading: 'Generating…', error: 'Could not be prepared · Open to retry', unavailable: 'Not saved with this analysis' }[status];
 
   setText('#moduleRequirementsMeta', countsData.total ? `${countsData.met} / ${countsData.total} matched · View evidence` : 'No requirements mapped');
   if (pending) {
@@ -777,7 +792,7 @@ function renderReport(report, { save = false, inputs = null } = {}) {
   $('#errorCard')?.classList.add('hidden');
   if (save && !latestReportSaved) { latestHistoryId = saveHistory(latestReport); latestReportSaved = true; renderHistory(); }
   icons();
-  if (inputs) loadSection('insights');
+  if (inputs) { loadSection('insights'); announce('Assessment ready. Supporting details are loading.'); }
   window.requestAnimationFrame(() => $('#report')?.focus({ preventScroll: true }));
 }
 

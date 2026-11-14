@@ -385,3 +385,15 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
   .theme-toggle { height: 44px; }
   .brand { min-height: 44px; min-width: 44px; }
 }
+
+/* Phase 1: honest sample label, and loading states that say what is still loading. */
+.sample-badge { padding: 3px 8px; color: var(--muted); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); font: 500 11px "DM Mono", ui-monospace, monospace; letter-spacing: 0.02em; }
+.sample-decision p.sample-disclaimer { margin: 0 0 6px; padding-top: 14px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.narrative-banner { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; padding: 11px 14px; color: var(--muted); background: var(--accent-soft); border-left: 2px solid var(--accent); font-size: 13px; }
+.narrative-banner[data-kind="error"] { border-left-color: var(--danger); color: var(--ink); }
+.narrative-banner .text-action { margin-left: auto; min-height: 44px; color: var(--accent-strong); }
+.narrative-banner-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: narrative-pulse 1.6s ease-in-out infinite; }
+.narrative-banner[data-kind="error"] .narrative-banner-dot { background: var(--danger); animation: none; }
+.report.details-pending #reportTitle, .report.details-pending .report-context > div:nth-child(-n+2) strong, .report.details-pending .analysis-module:not([data-module="requirements"]):not([data-module="strategy"]) small { animation: narrative-pulse 1.6s ease-in-out infinite; }
+.narrative-banner .text-action[hidden] { display: none; }
+.narrative-banner { flex-wrap: wrap; } .narrative-banner .text-action { white-space: nowrap; }
