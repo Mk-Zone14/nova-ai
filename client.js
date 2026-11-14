@@ -1013,6 +1013,14 @@ function updateNav() {
     const current = (item.dataset.nav === 'report' && reportVisible) || (item.dataset.nav === 'home' && !reportVisible);
     if (current) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
   });
+  // On narrow screens the nav scrolls sideways; keep the current item visible. Set scrollLeft directly, because scrollIntoView
+  // would also scroll the page vertically.
+  const nav = $('.header-actions');
+  const active = nav?.querySelector('[aria-current="page"]');
+  if (nav && active && nav.scrollWidth > nav.clientWidth) {
+    const target = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+    nav.scrollTo({ left: Math.max(0, target), behavior: scrollMode() });
+  }
 }
 function focusInput(card, field) {
   showWorkspace({ scroll: false });

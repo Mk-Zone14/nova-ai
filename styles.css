@@ -459,3 +459,18 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .pdf-export .glance-list li { break-inside: avoid; page-break-inside: avoid; }
 
 @media (max-width: 680px) { .constellation-field { opacity: 0.4; } [data-theme="light"] .constellation-field { opacity: 0.26; } }
+
+/* Phase 7: mobile and responsive refinement. */
+.sample-chip { min-height: 44px; }
+.detail-item-header { align-items: center; }
+summary.detail-item-header { min-height: 44px; cursor: pointer; }
+/* Title takes the free space so every status tag lines up on the right instead of floating mid-row. */
+.detail-item-header > strong { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 680px) {
+  /* Every report action keeps its label on a phone: two columns of 44px buttons instead of four unlabelled icons. */
+  .report-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+  .report-actions .secondary-button { justify-content: center; gap: 8px; width: 100%; border: 1px solid var(--line); }
+  .report-actions .action-wide { display: inline; }
+  /* The nav scrolls sideways; a fade on the trailing edge shows there is more. */
+  .header-actions { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-right: 28px; }
+}
