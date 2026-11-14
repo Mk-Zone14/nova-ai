@@ -156,7 +156,7 @@ Nova AI is designed with security in mind.
 * `.env` files are excluded from version control.
 * Learning-resource links never come from the model. Each skill gap is matched in code to a catalogue of checked pages (`resource-links.js`, 22 entries such as the Docker get-started guide, the Pro Git book, the Python tutorial, Google's ML crash course); the card shows that page, labelled "Verified page". A gap with no catalogue entry gets a labelled Coursera search-results link for the gap's own words, and a gap that is gained through work rather than a course (internships, years of experience) gets no link. The model's resource titles and URLs are ignored entirely; only its skill names are read. `safeResourceUrl` (host/provider whitelist) remains for callers that still hold a model URL.
 * Third-party scripts (pdf.js, html2pdf, lucide) are self-hosted in `vendor/` with recorded SHA-256 hashes, and the CSP allows scripts from this origin only.
-* Rate limiting is shared across serverless instances when Upstash Redis is configured (see below); otherwise it falls back to a per-instance limiter, which does **not** protect your Groq quota on Vercel.
+* Rate limiting is per client (10 analyses and 20 narrative sections per minute). The limiter is per serverless instance; shared limiting via Upstash Redis is supported but currently deferred and not configured (see below). The per-instance limiter does not protect the Groq quota against concurrent traffic across instances; on the free tier the worst case is a temporary quota outage, not a bill.
 * Dangerous URL schemes such as `javascript:` and `data:` are rejected.
 * External links use `noopener noreferrer`.
 * Security headers are configured through Vercel.
@@ -188,8 +188,8 @@ npm run test
 Current test status:
 
 ```text
-322 tests
-322 passed
+403 tests
+403 passed
 0 failed
 ```
 
@@ -242,7 +242,7 @@ Copy `.env.example` to `.env.local` and fill in your key:
 GROQ_API_KEY=your_groq_api_key
 ```
 
-Optional, recommended in production: set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (a free Upstash Redis database works) so the rate limit is shared across all serverless instances. Add the same variables to Vercel for Production and Preview.
+Optional: `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` enable shared rate limiting across serverless instances via Upstash Redis. This is **currently deferred** and not set up: the production deployment runs on the per-instance in-memory limiter, which is the intended configuration for now, and no Upstash infrastructure is required. The code path, environment-variable support and tests remain in place should it be enabled later (add the two variables to Vercel for Production and Preview).
 
 How the limiter identifies a client:
 
@@ -279,13 +279,6 @@ nova-ai/
 ├── client.js
 ├── index.html
 ├── styles.css
-├── brand-theme.css
-├── features.css
-├── premium.css
-├── refined.css
-├── motion.css
-├── disclosure.css
-├── launch-button.css
 ├── print.css
 ├── theme-init.js
 ├── resource-links.js
@@ -404,21 +397,21 @@ Things worth trying only after a baseline run, one at a time and re-running the 
 
 ---
 
-## 🗺️ Roadmap
+## 🎯 Product Scope
 
-Potential future improvements include:
+Nova AI is intentionally a focused Opportunity Copilot. It does seven things, and the code, tests and prompts are organised around them:
 
-* [ ] Resume file upload and parsing
-* [ ] Persistent candidate profiles
-* [ ] Opportunity bookmarking
-* [ ] Application tracking
-* [ ] More sophisticated evidence extraction
-* [ ] Opportunity discovery
-* [ ] Personalized application timelines
-* [ ] Better probability calibration
-* [ ] More learning-resource providers
-* [ ] Authentication and user accounts
-* [ ] Application history and analytics
+1. Determines formal application eligibility (whether the hard eligibility gates pass and the candidate can apply).
+2. Identifies unmet or unverified requirements.
+3. Evaluates resume-to-opportunity requirements matching, by tier (required and preferred), with the arithmetic shown.
+4. Identifies missing qualifications, skills and experience.
+5. Highlights candidate strengths that are supported by the profile text.
+6. Suggests grounded resume improvements that never add, inflate or strengthen claims the profile does not make.
+7. Provides relevant learning resources from a catalogue of checked pages, without fabricated courses or links.
+
+The cover letter and interview-preparation drafts are conveniences built on the same analysis; they are not part of this core scope and are not being extended.
+
+No broader platform expansion (user accounts, application tracking, opportunity discovery, resume file upload, dashboards or similar) is currently planned. Nova analyses what you paste and tells you where you stand; it does not guarantee employment, ATS success or application acceptance.
 
 ---
 
