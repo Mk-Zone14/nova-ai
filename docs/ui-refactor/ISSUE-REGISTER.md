@@ -15,6 +15,6 @@ Baseline (master `44fb0a5`): `npm run check` clean, `npm test` 403/403, `npm run
 | U8 | Three sample controls; two "See a sample decision" buttons | hero, workspace | Medium | Consolidate | journey test | 3 |
 | U9 | No navigation for Profile / Reports / Resources | header | High | Anchor navigation to existing sections | journey test | 3 |
 | U10 | Textareas ~3 lines tall; stacked rules | `.input-card` | High | Taller fields, fewer borders | screenshots | 4 |
-| U11 | Constellation lines cross text on the hero card | canvas | Medium | Layering, density | screenshots | 6 |
+| U11 | Constellation lines cross text on the hero card | canvas | Medium | Quiet zones over text, lower opacity and density, paused off-screen; card no longer moves | screenshots + browser | 6 (done) |
 | U12 | Mobile toolbar wraps, icon-only buttons unlabeled, history remove buttons overflow by 3px | `.report-actions`, history | High | Labels, layout | 375/390 checks | 7 |
 | U13 | Accessibility not yet audited (keyboard, focus, dialog, contrast) | all | Critical | Audit and fix | axe where available | 8 |

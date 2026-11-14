@@ -194,19 +194,22 @@ function loadSample(kind, { announce = true } = {}) {
   if (announce) toast(`Sample ${kind} loaded.`);
 }
 
+// Explicit scroll options override CSS scroll-behavior, so reduced motion has to be honoured here as well.
+function scrollMode() { return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; }
+
 function showWorkspace({ scroll = true } = {}) {
   document.body.classList.remove('report-mode', 'analysis-mode');
   $('#report')?.classList.add('hidden');
   $('#errorCard')?.classList.add('hidden');
   $('#workspace')?.classList.remove('hidden');
-  if (scroll) $('#workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (scroll) $('#workspace')?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
 }
 
 function loadSampleDecision() {
   showWorkspace({ scroll: false });
   loadSample('profile', { announce: false });
   loadSample('internship', { announce: false });
-  $('#workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('#workspace')?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
   toast('Sample profile and opportunity loaded. Review them, then build the brief.');
 }
 
@@ -221,27 +224,18 @@ $('#sampleDecisionHero')?.addEventListener('click', loadSampleDecision);
 profileInput?.addEventListener('input', counts);
 opportunityInput?.addEventListener('input', counts);
 
+// The one pointer effect besides the constellation: a soft light inside the sample card that follows the pointer. It does not
+// move the card or the page, so nothing shifts under the reader.
 function setupPointerGlow() {
   const zone = $('[data-pointer-zone]');
   const card = $('[data-pointer-card]');
   if (!zone || !card || matchMedia('(pointer: coarse)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  zone.addEventListener('pointermove', (event) => {
-    const rect = zone.getBoundingClientRect();
-    const x = `${event.clientX - rect.left}px`;
-    const y = `${event.clientY - rect.top}px`;
-    zone.style.setProperty('--pointer-x', x);
-    zone.style.setProperty('--pointer-y', y);
+  card.addEventListener('pointermove', (event) => {
     const cardRect = card.getBoundingClientRect();
-    card.style.setProperty('--card-shift-x', `${Math.max(-4, Math.min(4, (event.clientX - (cardRect.left + cardRect.width / 2)) / 90))}px`);
-    card.style.setProperty('--card-shift-y', `${Math.max(-4, Math.min(4, (event.clientY - (cardRect.top + cardRect.height / 2)) / 120))}px`);
     card.style.setProperty('--card-pointer-x', `${event.clientX - cardRect.left}px`);
     card.style.setProperty('--card-pointer-y', `${event.clientY - cardRect.top}px`);
   });
-  zone.addEventListener('pointerleave', () => {
-    zone.style.removeProperty('--pointer-x');
-    zone.style.removeProperty('--pointer-y');
-    card.style.removeProperty('--card-shift-x');
-    card.style.removeProperty('--card-shift-y');
+  card.addEventListener('pointerleave', () => {
     card.style.removeProperty('--card-pointer-x');
     card.style.removeProperty('--card-pointer-y');
   });
@@ -263,7 +257,17 @@ function setupConstellation() {
   const paletteForTheme = () => document.documentElement.dataset.theme === 'light'
     ? { node: 'rgba(50, 60, 80, 0.95)', line: 'rgba(50, 60, 80, 0.45)', hot: '60, 90, 150', field: 'rgba(60, 90, 150, 0.2)', fieldClear: 'rgba(60, 90, 150, 0)' }
     : { node: 'rgba(200, 215, 240, 0.95)', line: 'rgba(160, 180, 220, 0.55)', hot: '180, 200, 255', field: 'rgba(180, 200, 255, 0.3)', fieldClear: 'rgba(180, 200, 255, 0)' };
-  const nodeCount = () => Math.min(window.innerWidth < 680 ? 28 : 52, Math.max(18, Math.floor(width / 25)));
+  const nodeCount = () => Math.min(window.innerWidth < 680 ? 22 : 44, Math.max(16, Math.floor(width / 28)));
+  // Where text and the sample card sit. Lines and nodes inside these zones are drawn faintly so the field never competes with copy.
+  let quiet = [];
+  const measureQuiet = () => {
+    const zoneRect = zone.getBoundingClientRect();
+    quiet = ['.hero-copy', '.sample-decision'].map((selector) => $(selector)?.getBoundingClientRect()).filter(Boolean)
+      .map((r) => ({ left: r.left - zoneRect.left - 12, right: r.right - zoneRect.left + 12, top: r.top - zoneRect.top - 12, bottom: r.bottom - zoneRect.top + 12 }));
+  };
+  const inQuiet = (p) => quiet.some((r) => p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom);
+  const QUIET_ALPHA = 0.16;
+  let visible = true; // the hero is display:none in report mode and scrolls away; do not animate what nobody can see
   function resize() {
     const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
     const rect = zone.getBoundingClientRect();
@@ -274,6 +278,7 @@ function setupConstellation() {
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    measureQuiet();
     nodes = Array.from({ length: nodeCount() }, (_, index) => {
       const previous = nodes[index];
       return previous || { x: Math.random() * width, y: Math.random() * height, vx: (Math.random() - 0.5) * 0.035, vy: (Math.random() - 0.5) * 0.035, phase: Math.random() * Math.PI * 2 };
@@ -323,24 +328,34 @@ function setupConstellation() {
         if (distance > 142) continue;
         const proximity = pointer.active ? Math.max(0, 1 - Math.hypot((a.x + b.x) / 2 - pointer.x, (a.y + b.y) / 2 - pointer.y) / 180) : 0;
         context.strokeStyle = proximity > 0.05 ? `rgba(${palette.hot}, ${0.1 + proximity * 0.24})` : palette.line;
-        context.lineWidth = proximity > 0.05 ? 2.0 : 1.2;
+        context.lineWidth = proximity > 0.05 ? 1.6 : 1;
+        context.globalAlpha = inQuiet(a) || inQuiet(b) ? QUIET_ALPHA : 1;
         context.beginPath();
         context.moveTo(a.x, a.y);
         context.lineTo(b.x, b.y);
         context.stroke();
       }
     }
+    context.globalAlpha = 1;
     nodes.forEach((node) => {
       const distance = pointer.active ? Math.hypot(node.x - pointer.x, node.y - pointer.y) : 9999;
       const active = distance < 140;
       context.fillStyle = active ? (document.documentElement.dataset.theme === 'light' ? 'rgba(62, 86, 141, 0.65)' : 'rgba(209, 220, 242, 0.84)') : palette.node;
+      context.globalAlpha = inQuiet(node) ? QUIET_ALPHA : 1;
       context.beginPath();
-      context.arc(node.x, node.y, active ? 4.5 : 2.5, 0, Math.PI * 2);
+      context.arc(node.x, node.y, active ? 4 : 2.2, 0, Math.PI * 2);
       context.fill();
     });
-    if (!reduce.matches && !document.hidden) frame = requestAnimationFrame(draw);
+    context.globalAlpha = 1;
+    if (!reduce.matches && !document.hidden && visible) frame = requestAnimationFrame(draw);
   }
   function start() { cancelAnimationFrame(frame); frame = requestAnimationFrame(draw); }
+  if (typeof IntersectionObserver === 'function') {
+    new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (!visible) { cancelAnimationFrame(frame); frame = 0; } else { resize(); if (!reduce.matches && !document.hidden) start(); }
+    }).observe(zone);
+  }
   function stop() { cancelAnimationFrame(frame); frame = 0; }
   function onPointerMove(event) {
     const rect = zone.getBoundingClientRect();
@@ -354,12 +369,17 @@ function setupConstellation() {
   zone.addEventListener('pointermove', onPointerMove, { passive: true });
   zone.addEventListener('pointerleave', onPointerLeave, { passive: true });
   window.addEventListener('resize', resize, { passive: true });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (!reduce.matches) start(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (!reduce.matches && visible) start(); });
   reduce.addEventListener?.('change', () => { resize(); if (reduce.matches) stop(); else start(); });
   const themeObserver = new MutationObserver(() => draw(performance.now()));
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   if (!reduce.matches) start();
 }
+
+// The sample menu is a <details>: close it on Escape (returning focus to its button) and when the user clicks elsewhere.
+const sampleMenu = $('.sample-menu');
+sampleMenu?.addEventListener('keydown', (event) => { if (event.key === 'Escape' && sampleMenu.open) { sampleMenu.open = false; sampleMenu.querySelector('summary')?.focus(); } });
+document.addEventListener('click', (event) => { if (sampleMenu?.open && !sampleMenu.contains(event.target)) sampleMenu.open = false; });
 
 if ($('#themeToggle')) {
   $('#themeToggle').setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'dark'));
@@ -612,7 +632,7 @@ $('#dialogContent')?.addEventListener('click', (event) => {
 });
 $$('[data-module]').forEach((button) => button.addEventListener('click', () => openModule(button.dataset.module)));
 $('#viewAnalysisBtn')?.addEventListener('click', () => {
-  $('#moduleGrid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('#moduleGrid')?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
   $('#moduleGrid [data-module="requirements"]')?.focus();
 });
 $('#editInputsBtn')?.addEventListener('click', () => {
@@ -646,7 +666,7 @@ function renderHistory() {
     const entry = historyEntries().find((item) => String(item.id) === String(button.dataset.history));
     if (!entry) { renderHistory(); toast('That saved analysis has expired or was removed.'); return; }
     renderReport(entry.report, { save: false });
-    $('#report')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('#report')?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
   }));
   $$('[data-history-remove]').forEach((button) => button.addEventListener('click', () => {
     writeHistory(removeHistoryEntry(historyEntries(), button.dataset.historyRemove));
@@ -982,7 +1002,7 @@ function showReport() {
   document.body.classList.add('report-mode');
   $('#workspace')?.classList.add('hidden');
   $('#report')?.classList.remove('hidden');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: scrollMode() });
   window.requestAnimationFrame(() => $('#report')?.focus({ preventScroll: true }));
 }
 function updateNav() {
@@ -996,17 +1016,17 @@ function updateNav() {
 }
 function focusInput(card, field) {
   showWorkspace({ scroll: false });
-  $(card)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $(card)?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
   field?.focus({ preventScroll: true });
 }
 $$('[data-nav]').forEach((item) => item.addEventListener('click', (event) => {
   event.preventDefault();
   if (abortController) { toast('An analysis is running. Cancel it or wait for it to finish first.'); return; }
   switch (item.dataset.nav) {
-    case 'home': showWorkspace({ scroll: false }); window.scrollTo({ top: 0, behavior: 'smooth' }); break;
+    case 'home': showWorkspace({ scroll: false }); window.scrollTo({ top: 0, behavior: scrollMode() }); break;
     case 'profile': focusInput('#profileCard', profileInput); break;
     case 'opportunity': focusInput('#opportunityCard', opportunityInput); break;
-    case 'reports': { const history = $('#history'); if (history) history.open = true; history?.scrollIntoView({ behavior: 'smooth', block: 'start' }); $('#history > summary')?.focus({ preventScroll: true }); break; }
+    case 'reports': { const history = $('#history'); if (history) history.open = true; history?.scrollIntoView({ behavior: scrollMode(), block: 'start' }); $('#history > summary')?.focus({ preventScroll: true }); break; }
     case 'report': showReport(); break;
     case 'resources': openModule('resources'); break;
     default: break;
