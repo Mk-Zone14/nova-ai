@@ -1,7 +1,7 @@
 @media print {
   :root { color-scheme: light; }
   body { background: #fff !important; color: #111 !important; }
-  body::before, .site-header, .hero, .trust-strip, .workspace, .loading-panel, .error-card, .theme-toggle, .toast, .report-actions, .history-card, .analysis-dialog, .module-heading, .module-grid, .supplemental-grid { display: none !important; }
+  body::before, .constellation-field, .site-header, .hero, .trust-strip, .workspace, .loading-panel, .error-card, .theme-toggle, .toast, .report-actions, .history-card, .analysis-dialog, .module-heading, .module-grid, .supplemental-grid { display: none !important; }
   main, .report { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
   .report { display: block !important; }
   .report-toolbar { margin-bottom: 18px !important; }

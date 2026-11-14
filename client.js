@@ -225,32 +225,18 @@ $('#sampleDecisionHero')?.addEventListener('click', loadSampleDecision);
 profileInput?.addEventListener('input', counts);
 opportunityInput?.addEventListener('input', counts);
 
-// The one pointer effect besides the constellation: a soft light inside the sample card that follows the pointer. It does not
-// move the card or the page, so nothing shifts under the reader.
-function setupPointerGlow() {
-  const zone = $('[data-pointer-zone]');
-  const card = $('[data-pointer-card]');
-  if (!zone || !card || matchMedia('(pointer: coarse)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  card.addEventListener('pointermove', (event) => {
-    const cardRect = card.getBoundingClientRect();
-    card.style.setProperty('--card-pointer-x', `${event.clientX - cardRect.left}px`);
-    card.style.setProperty('--card-pointer-y', `${event.clientY - cardRect.top}px`);
-  });
-  card.addEventListener('pointerleave', () => {
-    card.style.removeProperty('--card-pointer-x');
-    card.style.removeProperty('--card-pointer-y');
-  });
-}
-
+// A fixed, full-page canvas behind everything: a slow constellation that follows the pointer, and, in place of a cursor glow,
+// a ring of particles that breathes around the pointer (elastic shrink, back-eased grow), ported from a p5/GSAP sketch.
 function setupConstellation() {
   const canvas = $('#constellationField');
-  const zone = $('[data-pointer-zone]');
-  if (!canvas || !zone) return;
+  if (!canvas) return;
   const context = canvas.getContext('2d', { alpha: true });
   if (!context) return;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  const coarse = matchMedia('(pointer: coarse)');
   const hint = $('#constellationHint');
-  const pointer = { x: -9999, y: -9999, active: false };
+  const pointer = { x: -9999, y: -9999, active: false, since: 0 };
+  const ring = { x: -9999, y: -9999, strength: 0, particles: [] };
   let nodes = [];
   let stars = []; // nodes the visitor adds by clicking; they fade out on their own
   let ripples = [];
@@ -260,37 +246,59 @@ function setupConstellation() {
   let last = 0;
   const MAX_STARS = 10;
   const STAR_LIFE = 14000;
+  const RIPPLE_MS = 1000;
+  const RIPPLE_REACH = 300;
+  const GLOW_DECAY = 0.02;
+  const RING_CYCLE = 16000; // shrink 8s + grow 8s, as in the source sketch
   const paletteForTheme = () => document.documentElement.dataset.theme === 'light'
-    ? { node: 'rgba(50, 60, 80, 0.95)', line: 'rgba(50, 60, 80, 0.45)', hot: '60, 90, 150', field: 'rgba(60, 90, 150, 0.2)', fieldClear: 'rgba(60, 90, 150, 0)', active: 'rgba(62, 86, 141, 0.7)' }
-    : { node: 'rgba(200, 215, 240, 0.95)', line: 'rgba(160, 180, 220, 0.55)', hot: '180, 200, 255', field: 'rgba(180, 200, 255, 0.3)', fieldClear: 'rgba(180, 200, 255, 0)', active: 'rgba(209, 220, 242, 0.9)' };
-  const nodeCount = () => Math.min(window.innerWidth < 680 ? 22 : 44, Math.max(16, Math.floor(width / 28)));
-  // Where text and the sample card sit. Static lines and nodes inside these zones are drawn faintly so the field never competes with copy.
+    ? { node: 'rgba(50, 60, 80, 0.95)', line: 'rgba(50, 60, 80, 0.45)', hot: '60, 90, 150', active: 'rgba(62, 86, 141, 0.7)', ring: ['77, 102, 158', '93, 100, 112', '77, 102, 158', '29, 32, 37'] }
+    : { node: 'rgba(200, 215, 240, 0.95)', line: 'rgba(160, 180, 220, 0.55)', hot: '180, 200, 255', active: 'rgba(209, 220, 242, 0.9)', ring: ['145, 165, 201', '168, 175, 185', '145, 165, 201', '241, 240, 235'] };
+  const nodeCount = () => Math.min(coarse.matches ? 30 : 64, Math.max(18, Math.floor((width * height) / 24000)));
+  // Text and cards: static lines and nodes inside these are drawn faintly so the field never competes with copy.
+  const QUIET_SELECTOR = '.hero-copy, .sample-decision, .trust-strip, .input-card, .decision-hero, .report-context, .requirements-glance, .module-grid, .supplemental-grid, .preparation-details, .history-card, .loading-panel, .error-card';
   let quiet = [];
+  let quietDirty = true;
   const measureQuiet = () => {
-    const zoneRect = zone.getBoundingClientRect();
-    quiet = ['.hero-copy', '.sample-decision'].map((selector) => $(selector)?.getBoundingClientRect()).filter(Boolean)
-      .map((r) => ({ left: r.left - zoneRect.left - 12, right: r.right - zoneRect.left + 12, top: r.top - zoneRect.top - 12, bottom: r.bottom - zoneRect.top + 12 }));
+    quiet = [...$$(QUIET_SELECTOR)].filter((el) => el.offsetParent !== null).map((el) => el.getBoundingClientRect())
+      .filter((r) => r.bottom > -12 && r.top < height + 12)
+      .map((r) => ({ left: r.left - 12, right: r.right + 12, top: r.top - 12, bottom: r.bottom + 12 }));
+    quietDirty = false;
   };
   const inQuiet = (p) => quiet.some((r) => p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom);
   const QUIET_ALPHA = 0.16;
-  // Interaction stays visible over text, but at a reduced strength.
-  const LIVE_QUIET_ALPHA = 0.45;
-  let visible = true; // the hero is display:none in report mode and scrolls away; do not animate what nobody can see
+  const LIVE_QUIET_ALPHA = 0.45; // interaction stays visible over text, at reduced strength
   const makeNode = (x, y, extra = {}) => ({ x, y, vx: (Math.random() - 0.5) * 0.035, vy: (Math.random() - 0.5) * 0.035, phase: Math.random() * Math.PI * 2, ox: 0, oy: 0, ovx: 0, ovy: 0, glow: 0, ...extra });
   const at = (node) => ({ x: node.x + node.ox, y: node.y + node.oy });
 
+  // Easings from the source sketch (GSAP names): elastic.in(1.5, 0.15) and back.in(3).
+  const elasticIn = (t, amplitude = 1.5, period = 0.15) => {
+    if (t <= 0) return 0; if (t >= 1) return 1;
+    const s = period / (Math.PI * 2) * Math.asin(1 / amplitude);
+    return -(amplitude * Math.pow(2, 10 * (t - 1)) * Math.sin((t - 1 - s) * (Math.PI * 2) / period));
+  };
+  const backIn = (t, overshoot = 3) => t * t * ((overshoot + 1) * t - overshoot);
+  // 0..1 along the cycle: val climbs with elastic.in for the first half, then falls back with back.in.
+  const interpolate = (u) => (u < 0.5 ? elasticIn(u * 2) : 1 - backIn((u - 0.5) * 2));
+  const buildRing = () => {
+    const count = coarse.matches ? 110 : 220;
+    ring.particles = Array.from({ length: count }, (_, k) => {
+      const i = k / count;
+      return { i, cos: Math.cos(i * Math.PI * 2), sin: Math.sin(i * Math.PI * 2), r: 1 + Math.floor(Math.random() * 3), offset: Math.pow(1 + Math.random(), 2.5) * (Math.random() * 0.03 - 0.015) * 8, color: Math.floor(Math.random() * 4) };
+    });
+  };
+
   function resize() {
     const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-    const rect = zone.getBoundingClientRect();
-    width = rect.width;
-    height = rect.height;
+    width = window.innerWidth;
+    height = window.innerHeight;
     canvas.width = Math.floor(width * ratio);
     canvas.height = Math.floor(height * ratio);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    measureQuiet();
     nodes = Array.from({ length: nodeCount() }, (_, index) => nodes[index] || makeNode(Math.random() * width, Math.random() * height));
+    if (!ring.particles.length) buildRing();
+    quietDirty = true;
     draw(0);
   }
 
@@ -307,7 +315,6 @@ function setupConstellation() {
     }
     if (!interactive) return;
     // Interaction moves a node by an offset that springs back to rest, so nothing snaps or drifts away for good.
-    // Close to the pointer a node steps aside; further out it leans toward the pointer, so the web visibly follows the cursor.
     let targetX = 0;
     let targetY = 0;
     if (pointer.active) {
@@ -322,14 +329,14 @@ function setupConstellation() {
     }
     node.ovx = (node.ovx + (targetX - node.ox) * 0.035) * 0.86;
     node.ovy = (node.ovy + (targetY - node.oy) * 0.035) * 0.86;
-    node.glow = Math.max(0, node.glow - delta16);
+    node.glow = Math.max(0, node.glow - GLOW_DECAY);
     for (const ripple of ripples) {
       const age = (time - ripple.born) / RIPPLE_MS;
       const p = at(node);
-      const gap = Math.hypot(p.x - ripple.x, p.y - ripple.y) - age * RIPPLE_REACH;
+      const away = Math.hypot(p.x - ripple.x, p.y - ripple.y) || 1;
+      const gap = away - age * RIPPLE_REACH;
       if (Math.abs(gap) < 30 && age < 1) {
         const push = (1 - Math.abs(gap) / 30) * (1 - age) * 1.6;
-        const away = Math.hypot(p.x - ripple.x, p.y - ripple.y) || 1;
         node.ovx += (p.x - ripple.x) / away * push;
         node.ovy += (p.y - ripple.y) / away * push;
         node.glow = 1;
@@ -338,22 +345,41 @@ function setupConstellation() {
     node.ox += node.ovx;
     node.oy += node.ovy;
   }
-  const RIPPLE_MS = 1000;
-  const RIPPLE_REACH = 300;
-  const delta16 = 0.02; // glow decays over roughly 50 frames
+  function starFade(node, time) {
+    if (!node.born) return 1;
+    const age = time - node.born;
+    return Math.min(1, age / 500, (STAR_LIFE - age) / 3000);
+  }
+
+  function drawRing(time, palette) {
+    // The ring eases toward the pointer and fades in and out with it.
+    const target = pointer.active ? 1 : 0;
+    ring.strength += (target - ring.strength) * 0.08;
+    if (ring.strength < 0.01) return;
+    if (ring.x < -1000) { ring.x = pointer.x; ring.y = pointer.y; }
+    ring.x += (pointer.x - ring.x) * 0.18;
+    ring.y += (pointer.y - ring.y) * 0.18;
+    const base = Math.min(width, height) * (coarse.matches ? 0.16 : 0.09);
+    const progress = 1 - ((time % RING_CYCLE) / RING_CYCLE);
+    const calm = inQuiet(ring) ? 0.55 : 1;
+    for (const particle of ring.particles) {
+      const val = interpolate((progress + particle.i) % 1);
+      const r = base * (1 + val * particle.offset);
+      const x = ring.x + particle.cos * r;
+      const y = ring.y + particle.sin * r;
+      context.fillStyle = `rgba(${palette.ring[particle.color]}, ${0.85 * ring.strength * calm})`;
+      context.beginPath();
+      context.arc(x, y, particle.r * 0.5, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
 
   function draw(time) {
     const delta = Math.min(32, time - last || 16);
     last = time;
     const palette = paletteForTheme();
+    if (quietDirty) measureQuiet();
     context.clearRect(0, 0, width, height);
-    if (pointer.active) {
-      const gradient = context.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, Math.min(240, width * 0.35));
-      gradient.addColorStop(0, palette.field);
-      gradient.addColorStop(1, palette.fieldClear);
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, width, height);
-    }
     const movement = reduce.matches ? 0 : delta;
     const interactive = !reduce.matches;
     stars = stars.filter((star) => time - star.born < STAR_LIFE);
@@ -361,7 +387,6 @@ function setupConstellation() {
     const all = [...nodes, ...stars];
     all.forEach((node) => step(node, time, movement, interactive));
 
-    // Lines between neighbours; those near the pointer light up.
     for (let i = 0; i < all.length; i += 1) {
       for (let j = i + 1; j < all.length; j += 1) {
         const a = at(all[i]);
@@ -383,7 +408,7 @@ function setupConstellation() {
 
     // The pointer is a node too: it tethers to the nearest few stars.
     if (pointer.active && interactive) {
-      const near = all.map((node) => ({ node, p: at(node) }))
+      const near = all.map((node) => ({ p: at(node) }))
         .map((entry) => ({ ...entry, d: Math.hypot(entry.p.x - pointer.x, entry.p.y - pointer.y) }))
         .filter((entry) => entry.d < 190).sort((x, y) => x.d - y.d).slice(0, 5);
       near.forEach(({ p, d }) => {
@@ -395,19 +420,13 @@ function setupConstellation() {
         context.lineTo(p.x, p.y);
         context.stroke();
       });
-      context.globalAlpha = 1;
-      context.fillStyle = `rgba(${palette.hot}, 0.7)`;
-      context.beginPath();
-      context.arc(pointer.x, pointer.y, 3, 0, Math.PI * 2);
-      context.fill();
     }
+    context.globalAlpha = 1;
 
-    // Click ripples.
     ripples.forEach((ripple) => {
       const age = (time - ripple.born) / RIPPLE_MS;
       context.strokeStyle = `rgba(${palette.hot}, ${0.42 * (1 - age)})`;
       context.lineWidth = 1.4;
-      context.globalAlpha = 1;
       context.beginPath();
       context.arc(ripple.x, ripple.y, age * RIPPLE_REACH, 0, Math.PI * 2);
       context.stroke();
@@ -424,33 +443,23 @@ function setupConstellation() {
       context.fill();
     });
     context.globalAlpha = 1;
-    if (!reduce.matches && !document.hidden && visible) frame = requestAnimationFrame(draw);
-  }
-  // A star appears over about half a second and fades over its last few seconds.
-  function starFade(node, time) {
-    if (!node.born) return 1;
-    const age = time - node.born;
-    return Math.min(1, age / 500, (STAR_LIFE - age) / 3000);
+
+    if (interactive) drawRing(time, palette);
+    if (!reduce.matches && !document.hidden) frame = requestAnimationFrame(draw);
   }
 
   function start() { cancelAnimationFrame(frame); frame = requestAnimationFrame(draw); }
   function stop() { cancelAnimationFrame(frame); frame = 0; }
-  if (typeof IntersectionObserver === 'function') {
-    new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
-      if (!visible) { stop(); } else { resize(); if (!reduce.matches && !document.hidden) start(); }
-    }).observe(zone);
-  }
-  const local = (event) => { const rect = zone.getBoundingClientRect(); return { x: event.clientX - rect.left, y: event.clientY - rect.top }; };
   function onPointerMove(event) {
-    Object.assign(pointer, local(event), { active: true });
+    pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true;
     if (!reduce.matches && !document.hidden && !frame) start();
   }
   function onPointerLeave() { pointer.active = false; }
-  // Click or tap on empty space: a ripple pushes the nearby stars, and a new star joins the web for a while.
+  // Click or tap on open space: a ripple pushes the nearby stars, and a new star joins the web for a while.
+  const SOLID = 'a, button, summary, input, textarea, select, label, details, dialog, header, p, h1, h2, h3, li, table, [data-pointer-card], .input-card, .report, .history-card';
   function onPointerDown(event) {
-    if (reduce.matches || event.button > 0 || event.target.closest('a, button, summary, input, textarea, select, label, details, [data-pointer-card]')) return;
-    const { x, y } = local(event);
+    if (reduce.matches || event.button > 0 || !(event.target instanceof Element) || event.target.closest(SOLID)) return;
+    const x = event.clientX; const y = event.clientY;
     const now = performance.now();
     ripples.push({ x, y, born: now });
     stars.push(makeNode(x, y, { born: now }));
@@ -464,16 +473,18 @@ function setupConstellation() {
 
   resize();
   if (hint) {
-    hint.textContent = matchMedia('(pointer: coarse)').matches ? 'Tap the background to add a star' : 'Click the background to add a star';
+    hint.textContent = coarse.matches ? 'Tap the background to add a star' : 'Click the background to add a star';
     hint.hidden = reduce.matches;
   }
   canvas.dataset.stars = '0';
-  zone.addEventListener('pointermove', onPointerMove, { passive: true });
-  zone.addEventListener('pointerleave', onPointerLeave, { passive: true });
-  zone.addEventListener('pointerdown', onPointerDown, { passive: true });
-  zone.addEventListener('pointerup', onPointerUp, { passive: true });
+  document.addEventListener('pointermove', onPointerMove, { passive: true });
+  document.documentElement.addEventListener('pointerleave', onPointerLeave, { passive: true });
+  document.addEventListener('pointerdown', onPointerDown, { passive: true });
+  document.addEventListener('pointerup', onPointerUp, { passive: true });
   window.addEventListener('resize', resize, { passive: true });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (!reduce.matches && visible) start(); });
+  window.addEventListener('scroll', () => { quietDirty = true; }, { passive: true });
+  new MutationObserver(() => { quietDirty = true; }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (!reduce.matches) start(); });
   reduce.addEventListener?.('change', () => { if (hint) hint.hidden = reduce.matches; ripples = []; stars = []; resize(); if (reduce.matches) stop(); else start(); });
   const themeObserver = new MutationObserver(() => draw(performance.now()));
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -1150,7 +1161,6 @@ new MutationObserver(updateNav).observe(document.body, { attributes: true, attri
 icons();
 counts();
 updateNav();
-setupPointerGlow();
 setupConstellation();
 renderHistory();
 

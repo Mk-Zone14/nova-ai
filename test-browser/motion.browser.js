@@ -142,7 +142,7 @@ async function bandLuma(page, x, y, width) {
   }, png.toString('base64'));
 }
 
-test('the pointer glow fades out before the hero box ends: no visible rectangle edge', async () => {
+test('no rectangle edge shows at the hero boundary while the pointer is near it', async () => {
   for (const theme of ['dark', 'light']) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await context.newPage();
@@ -162,10 +162,32 @@ test('the pointer glow fades out before the hero box ends: no visible rectangle 
   }
 });
 
-test('the field has feathered edges (mask) instead of a hard canvas boundary', async () => {
+test('the field is a fixed full-viewport layer, so it continues behind the workspace and the report', async () => {
   const { context, page } = await open();
-  const mask = await page.locator('#constellationField').evaluate((el) => { const s = getComputedStyle(el); return s.maskImage || s.webkitMaskImage; });
-  assert.match(mask, /linear-gradient/);
+  const box = () => page.locator('#constellationField').evaluate((el) => { const r = el.getBoundingClientRect(); return { pos: getComputedStyle(el).position, w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) }; });
+  const before = await box();
+  assert.equal(before.pos, 'fixed');
+  assert.deepEqual({ w: before.w, h: before.h, top: before.top }, { w: 1280, h: 900, top: 0 });
+  await page.click('#sampleDecisionBtn');
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await page.waitForTimeout(200);
+  assert.deepEqual(await box(), before, 'the layer does not scroll away');
+  await context.close();
+});
+
+test('the cursor is a breathing particle ring, not a glow: no radial gradient is drawn and the old card glow is gone', async () => {
+  const { context, page } = await open();
+  const cardAfter = await page.locator('[data-pointer-card]').evaluate((el) => getComputedStyle(el, '::after').backgroundImage);
+  assert.equal(cardAfter, 'none');
+  const usesGradient = await page.evaluate(() => {
+    let used = false;
+    const original = CanvasRenderingContext2D.prototype.createRadialGradient;
+    CanvasRenderingContext2D.prototype.createRadialGradient = function patched(...args) { used = true; return original.apply(this, args); };
+    return new Promise((resolve) => setTimeout(() => resolve(used), 400));
+  });
+  await page.mouse.move(400, 400, { steps: 5 });
+  await page.waitForTimeout(300);
+  assert.equal(usesGradient, false);
   await context.close();
 });
 
