@@ -251,7 +251,7 @@ test('clicking the hero background adds a star and a ripple; clicking a control 
 test('the interaction hint is shown, then fades once the visitor has used the field', async () => {
   const { context, page } = await open();
   const hint = page.locator('#constellationHint');
-  assert.match(await hint.innerText(), /click the background to add a star/i);
+  assert.match(await hint.innerText(), /click empty space to add a star/i);
   assert.equal(await hint.getAttribute('aria-hidden'), 'true');
   const zone = await page.locator('[data-pointer-zone]').boundingBox();
   await page.mouse.click(zone.x + 640, zone.y + zone.height - 40);
@@ -265,5 +265,39 @@ test('with reduced motion the field is static: no hint, no stars', async () => {
   const zone = await page.locator('[data-pointer-zone]').boundingBox();
   await page.mouse.click(zone.x + 640, zone.y + zone.height - 40);
   assert.equal(await page.locator('#constellationField').getAttribute('data-stars'), '0');
+  await context.close();
+});
+
+test('only one animation loop runs, even after resizes and theme changes (each used to start another)', async () => {
+  const { context, page } = await open();
+  await page.evaluate(() => {
+    window.__clears = 0;
+    const original = CanvasRenderingContext2D.prototype.clearRect;
+    CanvasRenderingContext2D.prototype.clearRect = function patched(...args) { window.__clears += 1; return original.apply(this, args); };
+  });
+  const perSecond = async () => { await page.evaluate(() => { window.__clears = 0; }); await page.waitForTimeout(1000); return page.evaluate(() => window.__clears); };
+  const baseline = await perSecond();
+  for (const size of [{ width: 1100, height: 800 }, { width: 1280, height: 900 }, { width: 900, height: 700 }]) await page.setViewportSize(size);
+  await page.click('#themeToggle');
+  await page.click('#themeToggle');
+  const after = await perSecond();
+  assert.ok(after <= baseline * 1.25 + 4, `${baseline} frames/s before, ${after} after resizes and theme toggles`);
+  await context.close();
+});
+
+test('a star added on top of the headline area is still clearly visible', async () => {
+  const { context, page } = await open();
+  const zone = await page.locator('.hero-copy').boundingBox();
+  // Click the empty strip below the hint, inside the text block's quiet zone, then read the painted alpha at that spot.
+  const x = Math.round(zone.x + 40); const y = Math.round(zone.y + zone.height + 4);
+  await page.mouse.click(x, y);
+  await page.waitForTimeout(700);
+  const alpha = await page.locator('#constellationField').evaluate((el, [px, py]) => {
+    const ratio = el.width / el.getBoundingClientRect().width;
+    const d = el.getContext('2d').getImageData(Math.round((px - 6) * ratio), Math.round((py - 6) * ratio), Math.round(12 * ratio), Math.round(12 * ratio)).data;
+    let max = 0; for (let i = 3; i < d.length; i += 4) max = Math.max(max, d[i]);
+    return max;
+  }, [x, y]);
+  assert.ok(alpha > 80, `star painted at alpha ${alpha}/255`);
   await context.close();
 });

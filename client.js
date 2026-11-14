@@ -267,9 +267,27 @@ function setupConstellation() {
     quiet = [...$$(QUIET_SELECTOR)].filter((el) => el.offsetParent !== null).map((el) => el.getBoundingClientRect())
       .filter((r) => r.bottom > -12 && r.top < height + 12)
       .map((r) => ({ left: r.left - 12, right: r.right + 12, top: r.top - 12, bottom: r.bottom + 12 }));
+    buildGrid();
     quietDirty = false;
   };
-  const inQuiet = (p) => quiet.some((r) => p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom);
+  // Coarse grid so the many per-frame lookups cost one array read each, not a scan of every rectangle.
+  const CELL = 20;
+  let grid = new Uint8Array(0);
+  let gridCols = 0;
+  const buildGrid = () => {
+    gridCols = Math.ceil(width / CELL) + 1;
+    const rows = Math.ceil(height / CELL) + 1;
+    grid = new Uint8Array(gridCols * rows);
+    for (const r of quiet) {
+      const x0 = Math.max(0, Math.floor(r.left / CELL)); const x1 = Math.min(gridCols - 1, Math.floor(r.right / CELL));
+      const y0 = Math.max(0, Math.floor(r.top / CELL)); const y1 = Math.min(rows - 1, Math.floor(r.bottom / CELL));
+      for (let y = y0; y <= y1; y += 1) grid.fill(1, y * gridCols + x0, y * gridCols + x1 + 1);
+    }
+  };
+  const inQuiet = (p) => {
+    const x = Math.floor(p.x / CELL); const y = Math.floor(p.y / CELL);
+    return x >= 0 && y >= 0 && x < gridCols && grid[y * gridCols + x] === 1;
+  };
   const QUIET_ALPHA = 0.2;
   const LIVE_QUIET_ALPHA = 0.55; // interaction stays visible over text, at reduced strength
   const makeNode = (x, y, extra = {}) => ({ x, y, vx: (Math.random() - 0.5) * 0.035, vy: (Math.random() - 0.5) * 0.035, phase: Math.random() * Math.PI * 2, ox: 0, oy: 0, ovx: 0, ovy: 0, glow: 0, ...extra });
@@ -286,7 +304,7 @@ function setupConstellation() {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     nodes = Array.from({ length: nodeCount() }, (_, index) => nodes[index] || makeNode(Math.random() * width, Math.random() * height));
     quietDirty = true;
-    draw(0);
+    render(performance.now());
   }
 
   function step(node, time, movement, interactive) {
@@ -360,7 +378,7 @@ function setupConstellation() {
     }
   }
 
-  function draw(time) {
+  function render(time) {
     const delta = Math.min(32, time - last || 16);
     last = time;
     const palette = paletteForTheme();
@@ -384,7 +402,8 @@ function setupConstellation() {
         context.strokeStyle = proximity > 0.05 ? `rgba(${palette.hot}, ${0.1 + proximity * 0.24})` : palette.line;
         context.lineWidth = proximity > 0.05 ? 1.6 : 1;
         const calm = inQuiet(a) || inQuiet(b);
-        context.globalAlpha = (calm ? (proximity > 0.05 ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * fade * (1 - distance / 240);
+        const live = proximity > 0.05 || all[i].born || all[j].born;
+        context.globalAlpha = (calm ? (live ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * fade * (1 - distance / 240);
         context.beginPath();
         context.moveTo(a.x, a.y);
         context.lineTo(b.x, b.y);
@@ -423,18 +442,23 @@ function setupConstellation() {
       const distance = pointer.active ? Math.hypot(p.x - pointer.x, p.y - pointer.y) : 9999;
       const active = distance < 140 || node.glow > 0.05;
       context.fillStyle = active ? palette.active : palette.node;
-      context.globalAlpha = (inQuiet(p) ? (active ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * Math.max(starFade(node, time), 0);
+      context.globalAlpha = (inQuiet(p) ? (active || node.born ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * Math.max(starFade(node, time), 0);
       context.beginPath();
-      context.arc(p.x, p.y, (active ? 4 : 2.2) + node.glow * 2.5 + (node.born ? 0.8 : 0), 0, Math.PI * 2);
+      context.arc(p.x, p.y, (active ? 4 : 2.2) + node.glow * 2.5 + (node.born ? 1.6 : 0), 0, Math.PI * 2);
       context.fill();
     });
     context.globalAlpha = 1;
 
     if (interactive) drawTrail(time, palette);
-    if (!reduce.matches && !document.hidden) frame = requestAnimationFrame(draw);
+  }
+  // The only place a frame is scheduled. Everything else calls render() directly, so a resize or theme change can never start a second loop.
+  function tick(time) {
+    frame = 0;
+    render(time);
+    if (!reduce.matches && !document.hidden) frame = requestAnimationFrame(tick);
   }
 
-  function start() { cancelAnimationFrame(frame); frame = requestAnimationFrame(draw); }
+  function start() { if (!frame) frame = requestAnimationFrame(tick); }
   function stop() { cancelAnimationFrame(frame); frame = 0; }
   function onPointerMove(event) {
     pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true;
@@ -484,7 +508,7 @@ function setupConstellation() {
 
   resize();
   if (hint) {
-    hint.textContent = coarse.matches ? 'Tap the background to add a star' : 'Click the background to add a star';
+    hint.textContent = coarse.matches ? 'Tap the background to add a star' : 'Click empty space to add a star';
     hint.hidden = reduce.matches;
   }
   canvas.dataset.stars = '0';
@@ -497,7 +521,7 @@ function setupConstellation() {
   new MutationObserver(() => { quietDirty = true; }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (!reduce.matches) start(); });
   reduce.addEventListener?.('change', () => { if (hint) hint.hidden = reduce.matches; ripples = []; stars = []; trail = []; resize(); if (reduce.matches) stop(); else start(); });
-  const themeObserver = new MutationObserver(() => draw(performance.now()));
+  const themeObserver = new MutationObserver(() => render(performance.now()));
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   if (!reduce.matches) start();
 }
