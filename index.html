@@ -99,7 +99,7 @@
             </div>
             <span class="character-count" id="profileCount">0 / 8,000</span>
           </div>
-          <textarea id="profileInput" maxlength="8000" aria-describedby="profileHelp" placeholder="Paste your profile or upload a resume."></textarea>
+          <textarea id="profileInput" maxlength="8000" aria-describedby="profileHelp profileMessage" placeholder="Paste your profile or upload a resume."></textarea>
           <div class="input-footer" id="profileHelp">
             <div class="footer-actions">
               <label class="text-action" for="resumeUpload"><i data-lucide="upload"></i>Upload resume</label>
@@ -107,6 +107,7 @@
             </div>
             <span>Drop a file here · TXT, MD or PDF · max 2 MB</span>
           </div>
+          <p class="field-message" id="profileMessage" role="status" hidden></p>
         </article>
         <article class="input-card" id="opportunityCard">
           <div class="input-step-line"><span class="step-badge">02</span><span class="input-state" id="opportunityState">Waiting for opportunity</span></div>
@@ -117,10 +118,11 @@
             </div>
             <span class="character-count" id="opportunityCount">0 / 12,000</span>
           </div>
-          <textarea id="opportunityInput" maxlength="12000" aria-describedby="opportunityHelp" placeholder="Paste the full opportunity description."></textarea>
+          <textarea id="opportunityInput" maxlength="12000" aria-describedby="opportunityHelp opportunityMessage" placeholder="Paste the full opportunity description."></textarea>
           <div class="input-footer" id="opportunityHelp">
             <span>Include the requirements, eligibility rules, deadline and documents. A fuller posting gives a sounder check.</span>
           </div>
+        <p class="field-message" id="opportunityMessage" role="status" hidden></p>
         </article>
       </div>
       <div class="analyze-row">

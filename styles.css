@@ -150,7 +150,7 @@ main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 54px 0 90
 .sample-chip { display: flex; align-items: center; width: 100%; min-height: 42px; padding: 0 10px; color: var(--muted); background: transparent; border: 0; border-radius: var(--radius-sm); text-align: left; font-size: 13px; transition: color var(--transition-fast), background var(--transition-fast); }
 .sample-chip:hover, .sample-chip:focus-visible { color: var(--ink); background: var(--accent-soft); }
 .input-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 35px; }
-.input-card { display: flex; flex-direction: column; min-height: 268px; padding: 18px 0 11px; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line); transition: border-color var(--transition-fast), background var(--transition-fast); }
+.input-card { position: relative; display: flex; flex-direction: column; min-height: 268px; padding: 18px 0 11px; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line); transition: border-color var(--transition-fast), background var(--transition-fast); }
 .input-card:hover { border-top-color: var(--accent); }
 .input-card:focus-within { border-top-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
 .input-card.drag-over { border-color: var(--accent); background: var(--accent-soft); }
@@ -162,7 +162,10 @@ main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 54px 0 90
 .card-heading label { display: block; font-size: 17px; font-weight: 700; letter-spacing: -0.025em; }
 .card-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
 .character-count { flex: 0 0 auto; padding: 4px 0; color: var(--faint); font-size: 12px; }
-textarea { width: 100%; flex: 1; min-height: 132px; padding: 16px 0 12px; color: var(--ink); background: transparent; border: 0; resize: vertical; outline: none; line-height: 1.65; }
+textarea { width: 100%; flex: 1; min-height: 260px; max-height: 70vh; margin-top: 14px; padding: 14px 16px; color: var(--ink); background: var(--surface-soft); border: 1px solid var(--line); border-radius: var(--radius-md); resize: vertical; outline: none; line-height: 1.65; transition: border-color var(--transition-fast), background var(--transition-fast); }
+textarea:hover { border-color: var(--line-strong); }
+textarea:focus { border-color: var(--accent); }
+textarea[aria-invalid="true"] { border-color: var(--danger); }
 textarea::placeholder { color: var(--faint); }
 .input-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; padding-top: 9px; color: var(--faint); border-top: 1px solid var(--line); font-size: 13px; }
 .footer-actions { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -416,3 +419,21 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
 .trust-strip > div > span:last-child { font-size: 13px; line-height: 1.5; }
 .brand { margin-right: auto; }
 .header-actions { margin-right: 12px; }
+
+/* Phase 4: workspace and form UX. */
+.card-heading { border-bottom: 0; padding-bottom: 0; }
+.input-footer { border-top: 0; }
+.character-count.near-limit { color: var(--warning); }
+.field-message { margin: 6px 0 0; padding: 8px 12px; color: var(--muted); border-left: 2px solid var(--accent); background: var(--accent-soft); font-size: 13px; line-height: 1.5; }
+.field-message[hidden] { display: none; }
+.field-message[data-kind="error"] { color: var(--ink); border-left-color: var(--danger); }
+.field-message[data-kind="warning"] { color: var(--ink); border-left-color: var(--warning); }
+#profileCard.drag-over::after { content: "Drop your resume to upload it"; position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; color: var(--accent-strong); background: color-mix(in srgb, var(--bg) 82%, transparent); border: 1px dashed var(--accent); border-radius: var(--radius-md); font-weight: 700; pointer-events: none; }
+.input-state.ready { font-weight: 500; }
+@media (max-width: 680px) {
+  textarea { min-height: 200px; }
+  .analyze-row { flex-direction: row; align-items: center; }
+  .analysis-note { display: none; }
+  .analyze-actions { flex: 1; }
+  .analyze-actions .analyze-button { flex: 2; min-width: 0; }
+}

@@ -153,11 +153,24 @@ function countTo(element, target, suffix = '', duration = 650) {
   requestAnimationFrame(tick);
 }
 
+// An inline message under a field: unlike a toast it stays until the problem is fixed, and screen readers hear it.
+function fieldMessage(field, text, kind = 'info') {
+  const element = $(field === profileInput ? '#profileMessage' : '#opportunityMessage');
+  if (!element) return;
+  element.textContent = text || '';
+  element.hidden = !text;
+  element.dataset.kind = text ? kind : '';
+}
+let profileSource = null; // file name of an uploaded resume, shown with the profile status
 function counts() {
   const pc = $('#profileCount');
   const oc = $('#opportunityCount');
   if (pc) pc.textContent = `${profileInput.value.length.toLocaleString()} / 8,000`;
   if (oc) oc.textContent = `${opportunityInput.value.length.toLocaleString()} / 12,000`;
+  for (const [element, field] of [[pc, profileInput], [oc, opportunityInput]]) {
+    const max = Number(field.maxLength);
+    element?.classList.toggle('near-limit', field.value.length >= max * 0.9);
+  }
   const MIN_CHARS = 50; // the same minimum runAnalysis enforces
   const stateText = (value, ready, empty) => {
     const length = value.trim().length;
@@ -169,7 +182,7 @@ function counts() {
     const element = $(selector);
     if (!element) continue;
     const state = stateText(field.value, ready, empty);
-    element.textContent = state.text;
+    element.textContent = state.ready && field === profileInput && profileSource ? `${state.text} · ${profileSource}` : state.text;
     element.classList.toggle('ready', state.ready);
   }
 }
@@ -395,53 +408,65 @@ async function addResumeFile(file) {
   const fileName = file.name.toLowerCase();
   const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf');
   const isText = file.type.startsWith('text/') || /\.(txt|md)$/i.test(fileName);
-  if (!isPdf && !isText) {
-    toast('Please upload a TXT, Markdown, or PDF resume.');
-    return;
-  }
-  if (f.size > 2000000) {
-    toast('File is too large. Please choose a file smaller than 2 MB.');
-    return;
-  }
+  const fail = (message) => { fieldMessage(profileInput, message, 'error'); toast(message); };
+  const LIMIT = 8000; // keep in step with the textarea maxlength (asserted by test/quality.test.js)
+  // Loads extracted text into the profile and says plainly if the field limit cut any of it off.
+  const accept = (text, label) => {
+    profileInput.value = text.slice(0, 8000);
+    profileSource = file.name;
+    counts();
+    profileInput.removeAttribute('aria-invalid');
+    if (text.length > LIMIT) {
+      fieldMessage(profileInput, `${file.name} has ${text.length.toLocaleString()} characters. Only the first ${LIMIT.toLocaleString()} were kept; check that what matters is included.`, 'warning');
+      toast(`${label} Only the first ${LIMIT.toLocaleString()} characters were kept.`, 5000);
+    } else {
+      fieldMessage(profileInput, '');
+      toast(label);
+    }
+  };
+  if (!isPdf && !isText) { fail('Please upload a TXT, Markdown, or PDF resume.'); return; }
+  if (f.size > 2000000) { fail('File is too large. Please choose a file smaller than 2 MB.'); return; }
   if (isPdf) {
     toast('Reading PDF…');
     const text = await extractTextFromPDF(file);
-    if (text && text.length > 10) {
-      profileInput.value = text.slice(0, 8000);
-      counts();
-      toast(`Resume extracted from PDF (${text.length.toLocaleString()} characters).`);
-    } else if (text !== null) {
-      toast('PDF appears empty or image-based. Paste your resume text instead.');
-    }
+    if (text && text.length > 10) accept(text, `Resume extracted from PDF (${text.length.toLocaleString()} characters).`);
+    else if (text !== null) fail('This PDF looks empty or image-based. Paste your resume text instead.');
     return;
   }
-  if (file.size > 500000) {
-    toast('Choose a text file smaller than 500 KB.');
-    return;
-  }
+  if (file.size > 500000) { fail('Choose a text file smaller than 500 KB.'); return; }
   try {
-    profileInput.value = (await file.text()).slice(0, 8000);
-    counts();
-    toast('Resume added and ready for analysis.');
+    accept(await file.text(), 'Resume added and ready for analysis.');
   } catch {
-    toast('Could not read this file. Please try a different format.');
+    fail('Could not read this file. Please try a different format.');
   }
 }
 
-[profileInput, opportunityInput].forEach((field) => field?.addEventListener('input', () => field.removeAttribute('aria-invalid')));
-$('#resumeUpload')?.addEventListener('change', (event) => addResumeFile(event.target.files?.[0]));
+[profileInput, opportunityInput].forEach((field) => field?.addEventListener('input', () => {
+  field.removeAttribute('aria-invalid');
+  if (field === profileInput && !field.value.trim()) { profileSource = null; counts(); }
+  const atLimit = field.value.length >= Number(field.maxLength);
+  fieldMessage(field, atLimit ? `Limit of ${Number(field.maxLength).toLocaleString()} characters reached. Anything beyond it is not kept.` : '', 'warning');
+}));
+$('#resumeUpload')?.addEventListener('change', (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = ''; // choosing the same file again must still fire a change
+  addResumeFile(file);
+});
 $$('.input-card').forEach((card) => {
-  card.addEventListener('dragover', (event) => { event.preventDefault(); card.classList.add('drag-over'); });
-  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  const accepts = card.id === 'profileCard';
+  let depth = 0; // dragenter/dragleave fire for every child element, so count them to avoid flicker
+  card.addEventListener('dragenter', () => { depth += 1; if (accepts) card.classList.add('drag-over'); });
+  card.addEventListener('dragover', (event) => { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = accepts ? 'copy' : 'none'; });
+  card.addEventListener('dragleave', () => { depth = Math.max(0, depth - 1); if (!depth) card.classList.remove('drag-over'); });
   card.addEventListener('drop', (event) => {
     event.preventDefault();
+    depth = 0;
     card.classList.remove('drag-over');
     // A resume only ever belongs in the profile box; dropping it on the opportunity box must not silently replace the profile.
-    if (card.id !== 'profileCard') { if (event.dataTransfer.files?.length) toast('Drop your resume on the profile box. Paste the opportunity text here.'); return; }
+    if (!accepts) { if (event.dataTransfer.files?.length) toast('Drop your resume on the profile box. Paste the opportunity text here.'); return; }
     addResumeFile(event.dataTransfer.files?.[0]);
   });
 });
-
 
 function loading(show) {
   $('#loadingPanel')?.classList.toggle('hidden', !show);
@@ -486,6 +511,7 @@ async function runAnalysis() {
   const rejectInput = (fields, message) => {
     fields.forEach((field) => field.setAttribute('aria-invalid', 'true'));
     fields[0].focus(); // take keyboard and screen-reader users to the problem, not just a toast
+    fieldMessage(fields[0], message, 'error');
     toast(message);
   };
   const missing = [profileInput, opportunityInput].filter((field) => !field.value.trim());
@@ -908,6 +934,9 @@ $('#printBtn')?.addEventListener('click', () => { if (!exportBlocked()) window.p
 function reset() {
   profileInput.value = '';
   opportunityInput.value = '';
+  profileSource = null;
+  fieldMessage(profileInput, '');
+  fieldMessage(opportunityInput, '');
   latestReport = null;
   latestReportSaved = false;
   latestHistoryId = null;
