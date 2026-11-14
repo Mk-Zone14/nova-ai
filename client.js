@@ -225,8 +225,8 @@ $('#sampleDecisionHero')?.addEventListener('click', loadSampleDecision);
 profileInput?.addEventListener('input', counts);
 opportunityInput?.addEventListener('input', counts);
 
-// A fixed, full-page canvas behind everything: a slow constellation that follows the pointer, and, in place of a cursor glow,
-// a ring of particles that breathes around the pointer (elastic shrink, back-eased grow), ported from a p5/GSAP sketch.
+// A fixed, full-page canvas behind everything: a slow constellation that leans toward the pointer, scrolls with the page
+// (parallax), leaves a short trail behind the pointer, and lets the visitor add stars and ripples by clicking open space.
 function setupConstellation() {
   const canvas = $('#constellationField');
   if (!canvas) return;
@@ -236,7 +236,9 @@ function setupConstellation() {
   const coarse = matchMedia('(pointer: coarse)');
   const hint = $('#constellationHint');
   const pointer = { x: -9999, y: -9999, active: false, since: 0 };
-  const ring = { x: -9999, y: -9999, strength: 0, particles: [] };
+  let trail = []; // marks the pointer leaves behind; each drifts up and fades
+  let travel = { x: -9999, y: -9999, since: 0 };
+  let scrollY = window.scrollY;
   let nodes = [];
   let stars = []; // nodes the visitor adds by clicking; they fade out on their own
   let ripples = [];
@@ -249,11 +251,14 @@ function setupConstellation() {
   const RIPPLE_MS = 1000;
   const RIPPLE_REACH = 300;
   const GLOW_DECAY = 0.02;
-  const RING_CYCLE = 16000; // shrink 8s + grow 8s, as in the source sketch
+  const TRAIL_LIFE = 1400;
+  const TRAIL_GAP = 34; // pointer travel between two marks, in px
+  const MAX_TRAIL = 60;
+  const PARALLAX = 0.12; // how far the field moves per px of page scroll, so it feels attached to the page
   const paletteForTheme = () => document.documentElement.dataset.theme === 'light'
-    ? { node: 'rgba(50, 60, 80, 0.95)', line: 'rgba(50, 60, 80, 0.45)', hot: '60, 90, 150', active: 'rgba(62, 86, 141, 0.7)', ring: ['77, 102, 158', '93, 100, 112', '77, 102, 158', '29, 32, 37'] }
-    : { node: 'rgba(200, 215, 240, 0.95)', line: 'rgba(160, 180, 220, 0.55)', hot: '180, 200, 255', active: 'rgba(209, 220, 242, 0.9)', ring: ['145, 165, 201', '168, 175, 185', '145, 165, 201', '241, 240, 235'] };
-  const nodeCount = () => Math.min(coarse.matches ? 30 : 64, Math.max(18, Math.floor((width * height) / 24000)));
+    ? { node: 'rgba(50, 60, 80, 1)', line: 'rgba(50, 60, 80, 0.58)', hot: '60, 90, 150', active: 'rgba(62, 86, 141, 0.7)' }
+    : { node: 'rgba(205, 218, 242, 1)', line: 'rgba(165, 185, 225, 0.7)', hot: '180, 200, 255', active: 'rgba(209, 220, 242, 0.9)' };
+  const nodeCount = () => Math.min(coarse.matches ? 36 : 84, Math.max(22, Math.floor((width * height) / 18000)));
   // Text and cards: static lines and nodes inside these are drawn faintly so the field never competes with copy.
   const QUIET_SELECTOR = '.hero-copy, .sample-decision, .trust-strip, .input-card, .decision-hero, .report-context, .requirements-glance, .module-grid, .supplemental-grid, .preparation-details, .history-card, .loading-panel, .error-card';
   let quiet = [];
@@ -265,27 +270,10 @@ function setupConstellation() {
     quietDirty = false;
   };
   const inQuiet = (p) => quiet.some((r) => p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom);
-  const QUIET_ALPHA = 0.16;
-  const LIVE_QUIET_ALPHA = 0.45; // interaction stays visible over text, at reduced strength
+  const QUIET_ALPHA = 0.2;
+  const LIVE_QUIET_ALPHA = 0.55; // interaction stays visible over text, at reduced strength
   const makeNode = (x, y, extra = {}) => ({ x, y, vx: (Math.random() - 0.5) * 0.035, vy: (Math.random() - 0.5) * 0.035, phase: Math.random() * Math.PI * 2, ox: 0, oy: 0, ovx: 0, ovy: 0, glow: 0, ...extra });
   const at = (node) => ({ x: node.x + node.ox, y: node.y + node.oy });
-
-  // Easings from the source sketch (GSAP names): elastic.in(1.5, 0.15) and back.in(3).
-  const elasticIn = (t, amplitude = 1.5, period = 0.15) => {
-    if (t <= 0) return 0; if (t >= 1) return 1;
-    const s = period / (Math.PI * 2) * Math.asin(1 / amplitude);
-    return -(amplitude * Math.pow(2, 10 * (t - 1)) * Math.sin((t - 1 - s) * (Math.PI * 2) / period));
-  };
-  const backIn = (t, overshoot = 3) => t * t * ((overshoot + 1) * t - overshoot);
-  // 0..1 along the cycle: val climbs with elastic.in for the first half, then falls back with back.in.
-  const interpolate = (u) => (u < 0.5 ? elasticIn(u * 2) : 1 - backIn((u - 0.5) * 2));
-  const buildRing = () => {
-    const count = coarse.matches ? 110 : 220;
-    ring.particles = Array.from({ length: count }, (_, k) => {
-      const i = k / count;
-      return { i, cos: Math.cos(i * Math.PI * 2), sin: Math.sin(i * Math.PI * 2), r: 1 + Math.floor(Math.random() * 3), offset: Math.pow(1 + Math.random(), 2.5) * (Math.random() * 0.03 - 0.015) * 8, color: Math.floor(Math.random() * 4) };
-    });
-  };
 
   function resize() {
     const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -297,7 +285,6 @@ function setupConstellation() {
     canvas.style.height = `${height}px`;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     nodes = Array.from({ length: nodeCount() }, (_, index) => nodes[index] || makeNode(Math.random() * width, Math.random() * height));
-    if (!ring.particles.length) buildRing();
     quietDirty = true;
     draw(0);
   }
@@ -351,26 +338,25 @@ function setupConstellation() {
     return Math.min(1, age / 500, (STAR_LIFE - age) / 3000);
   }
 
-  function drawRing(time, palette) {
-    // The ring eases toward the pointer and fades in and out with it.
-    const target = pointer.active ? 1 : 0;
-    ring.strength += (target - ring.strength) * 0.08;
-    if (ring.strength < 0.01) return;
-    if (ring.x < -1000) { ring.x = pointer.x; ring.y = pointer.y; }
-    ring.x += (pointer.x - ring.x) * 0.18;
-    ring.y += (pointer.y - ring.y) * 0.18;
-    const base = Math.min(width, height) * (coarse.matches ? 0.16 : 0.09);
-    const progress = 1 - ((time % RING_CYCLE) / RING_CYCLE);
-    const calm = inQuiet(ring) ? 0.55 : 1;
-    for (const particle of ring.particles) {
-      const val = interpolate((progress + particle.i) % 1);
-      const r = base * (1 + val * particle.offset);
-      const x = ring.x + particle.cos * r;
-      const y = ring.y + particle.sin * r;
-      context.fillStyle = `rgba(${palette.ring[particle.color]}, ${0.85 * ring.strength * calm})`;
+  function drawTrail(time, palette) {
+    trail = trail.filter((mark) => time - mark.born < TRAIL_LIFE);
+    canvas.dataset.trail = String(trail.length);
+    for (const mark of trail) {
+      const life = (time - mark.born) / TRAIL_LIFE;
+      const ease = 1 - life * life;
+      const y = mark.y - life * 26;
+      const calm = inQuiet(mark) ? 0.55 : 1;
+      context.fillStyle = `rgba(${palette.hot}, ${0.75 * ease * calm})`;
       context.beginPath();
-      context.arc(x, y, particle.r * 0.5, 0, Math.PI * 2);
+      context.arc(mark.x + Math.sin(mark.phase + life * 4) * 3, y, mark.size * (1 - life * 0.5), 0, Math.PI * 2);
       context.fill();
+      if (mark.size > 2) {
+        context.strokeStyle = `rgba(${palette.hot}, ${0.35 * ease * calm})`;
+        context.lineWidth = 1;
+        context.beginPath();
+        context.arc(mark.x, y, mark.size + life * 14, 0, Math.PI * 2);
+        context.stroke();
+      }
     }
   }
 
@@ -392,13 +378,13 @@ function setupConstellation() {
         const a = at(all[i]);
         const b = at(all[j]);
         const distance = Math.hypot(a.x - b.x, a.y - b.y);
-        if (distance > 142) continue;
+        if (distance > 160) continue;
         const proximity = pointer.active ? Math.max(0, 1 - Math.hypot((a.x + b.x) / 2 - pointer.x, (a.y + b.y) / 2 - pointer.y) / 180) : 0;
         const fade = Math.max(starFade(all[i], time), 0) * Math.max(starFade(all[j], time), 0);
         context.strokeStyle = proximity > 0.05 ? `rgba(${palette.hot}, ${0.1 + proximity * 0.24})` : palette.line;
         context.lineWidth = proximity > 0.05 ? 1.6 : 1;
         const calm = inQuiet(a) || inQuiet(b);
-        context.globalAlpha = (calm ? (proximity > 0.05 ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * fade * (1 - distance / 220);
+        context.globalAlpha = (calm ? (proximity > 0.05 ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * fade * (1 - distance / 240);
         context.beginPath();
         context.moveTo(a.x, a.y);
         context.lineTo(b.x, b.y);
@@ -444,7 +430,7 @@ function setupConstellation() {
     });
     context.globalAlpha = 1;
 
-    if (interactive) drawRing(time, palette);
+    if (interactive) drawTrail(time, palette);
     if (!reduce.matches && !document.hidden) frame = requestAnimationFrame(draw);
   }
 
@@ -452,7 +438,32 @@ function setupConstellation() {
   function stop() { cancelAnimationFrame(frame); frame = 0; }
   function onPointerMove(event) {
     pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true;
-    if (!reduce.matches && !document.hidden && !frame) start();
+    if (reduce.matches) return;
+    // Leave a mark every TRAIL_GAP px of travel (denser while the button is held), never a mark per event.
+    const moved = Math.hypot(pointer.x - travel.x, pointer.y - travel.y);
+    const gap = event.buttons ? TRAIL_GAP / 2 : TRAIL_GAP;
+    if (moved > gap) {
+      travel = { x: pointer.x, y: pointer.y, since: performance.now() };
+      trail.push({ x: pointer.x, y: pointer.y, born: travel.since, size: event.buttons ? 2.6 + Math.random() * 1.6 : 1.4 + Math.random() * 1.4, phase: Math.random() * Math.PI * 2 });
+      if (trail.length > MAX_TRAIL) trail.shift();
+      canvas.dataset.trail = String(trail.length);
+    }
+    if (!document.hidden && !frame) start();
+  }
+  function onScroll() {
+    const next = window.scrollY;
+    const shift = (next - scrollY) * PARALLAX;
+    scrollY = next;
+    quietDirty = true;
+    if (reduce.matches || !shift) return;
+    for (const node of nodes) {
+      node.y -= shift;
+      if (node.y < -20) node.y += height + 40;
+      if (node.y > height + 20) node.y -= height + 40;
+    }
+    for (const star of stars) star.y -= shift;
+    for (const mark of trail) mark.y -= shift;
+    if (!document.hidden && !frame) start();
   }
   function onPointerLeave() { pointer.active = false; }
   // Click or tap on open space: a ripple pushes the nearby stars, and a new star joins the web for a while.
@@ -482,10 +493,10 @@ function setupConstellation() {
   document.addEventListener('pointerdown', onPointerDown, { passive: true });
   document.addEventListener('pointerup', onPointerUp, { passive: true });
   window.addEventListener('resize', resize, { passive: true });
-  window.addEventListener('scroll', () => { quietDirty = true; }, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
   new MutationObserver(() => { quietDirty = true; }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (!reduce.matches) start(); });
-  reduce.addEventListener?.('change', () => { if (hint) hint.hidden = reduce.matches; ripples = []; stars = []; resize(); if (reduce.matches) stop(); else start(); });
+  reduce.addEventListener?.('change', () => { if (hint) hint.hidden = reduce.matches; ripples = []; stars = []; trail = []; resize(); if (reduce.matches) stop(); else start(); });
   const themeObserver = new MutationObserver(() => draw(performance.now()));
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   if (!reduce.matches) start();
