@@ -507,3 +507,86 @@ test('real-model regression (Preview, 2026-11-11): the next best action is never
   assert.notEqual(nextBestAction({ resumeImprovements: run3.resumeImprovements }), run3.resumeImprovements[0].suggested);
   assert.match(nextBestAction({ resumeImprovements: run3.resumeImprovements }), /^Update your resume: replace /);
 });
+
+// ---- Phase 1: report header and narrative banner never present a loading stand-in as final information ----------------
+const { reportHeader, narrativeBanner, notAvailable } = model;
+
+test('reportHeader says it is still reading while the supporting details load', () => {
+  const header = reportHeader({ eligibilityVerdict: 'Eligible' }, 'loading');
+  assert.equal(header.pending, true);
+  assert.match(header.title, /Reading opportunity details/);
+  assert.match(header.candidate, /Loading candidate information/);
+  assert.doesNotMatch(JSON.stringify(header), /Eligibility assessment|Candidate profile|Not available from Nova/);
+});
+
+test('reportHeader uses real names as soon as they exist, even while other sections still load', () => {
+  const report = { opportunitySummary: { role: 'Product Engineering Intern', organization: 'Atlas Labs', deadline: '30 Sep 2026' }, profileSummary: { name: 'Priya Sharma', degree: 'B.Tech CSE', university: 'DTU' } };
+  for (const status of ['loading', undefined]) {
+    const header = reportHeader(report, status);
+    assert.equal(header.pending, false);
+    assert.equal(header.title, 'Product Engineering Intern');
+    assert.equal(header.opportunityMeta, 'Atlas Labs · 30 Sep 2026');
+    assert.equal(header.candidate, 'Priya Sharma');
+    assert.equal(header.candidateMeta, 'B.Tech CSE · DTU');
+  }
+});
+
+test('reportHeader is final and honest when the details failed or were never saved', () => {
+  for (const status of ['error', 'unavailable']) {
+    const header = reportHeader({}, status);
+    assert.equal(header.pending, false);
+    assert.equal(header.title, 'Fit brief');
+    assert.match(header.opportunity, /unavailable/);
+    assert.doesNotMatch(JSON.stringify(header), /Reading|Loading/);
+  }
+});
+
+test('reportHeader keeps its previous wording once the details are ready but a field is missing', () => {
+  const header = reportHeader({ opportunitySummary: {}, profileSummary: {} }, undefined);
+  assert.equal(header.title, 'Eligibility assessment');
+  assert.equal(header.candidate, 'Candidate profile');
+  assert.equal(header.candidateMeta, notAvailable());
+});
+
+test('narrativeBanner distinguishes loading, failure with retry, and nothing to say', () => {
+  assert.equal(narrativeBanner('loading').canRetry, false);
+  assert.match(narrativeBanner('loading').text, /Assessment ready/);
+  const failed = narrativeBanner('error');
+  assert.equal(failed.canRetry, true);
+  assert.match(failed.text, /assessment above is unaffected/);
+  assert.equal(narrativeBanner(undefined), null);
+  assert.equal(narrativeBanner('unavailable'), null);
+});
+
+test('historyTitle names a saved report after its opportunity and falls back to the store default', () => {
+  assert.equal(model.historyTitle({ opportunitySummary: { role: 'Data Intern' } }), 'Data Intern');
+  assert.equal(model.historyTitle({ opportunityName: 'Fellowship' }), 'Fellowship');
+  assert.equal(model.historyTitle({}), 'Analysis');
+  assert.equal(model.historyTitle(null), 'Analysis');
+});
+
+// ---- Phase 5: requirements at a glance -------------------------------------------------------------------------------
+test('requirementsGlance lists required items first, uses the shared status words and escapes model text', () => {
+  const report = { requirementMapping: [
+    { requirement: 'Nice to have <b>Docker</b>', status: 'MISSING', mandatory: false },
+    { requirement: 'Python', status: 'MET', mandatory: true },
+    { requirement: 'SQL', status: 'PARTIAL', mandatory: true },
+    { requirement: 'Unclear one', status: 'weird', mandatory: false }
+  ] };
+  const glance = model.requirementsGlance(report);
+  assert.deepEqual(glance.rows.map((row) => row.text), ['Python', 'SQL', 'Nice to have <b>Docker</b>', 'Unclear one']);
+  assert.deepEqual(glance.rows.map((row) => row.status.label), ['Matched', 'Partially matched', 'Not met', 'Not enough evidence']);
+  assert.equal(glance.total, 4);
+  assert.equal(glance.hidden, 0);
+  assert.doesNotMatch(glance.html, /<b>Docker/);
+  assert.match(glance.html, /&lt;b&gt;Docker/);
+  assert.match(glance.html, /Required/);
+});
+
+test('requirementsGlance caps the list and says how many are not shown', () => {
+  const report = { requirementMapping: Array.from({ length: 11 }, (_, index) => ({ requirement: `Req ${index}`, status: 'MET', mandatory: false })) };
+  const glance = model.requirementsGlance(report, 8);
+  assert.equal(glance.rows.length, 8);
+  assert.equal(glance.hidden, 3);
+  assert.equal(model.requirementsGlance({}).total, 0);
+});

@@ -167,6 +167,17 @@
     const items = requirementItems(report);
     return { total: items.length, met: items.filter((item) => normalizeStatus(item.status).key === 'met').length, items };
   }
+  // The requirements at a glance, shown on the report itself so the main question ("which requirements do I meet?") is not
+  // behind a click. Required items come first, then the model's order. Status words come from normalizeStatus, never new wording.
+  function requirementsGlance(report, limit = 8) {
+    const items = requirementItems(report).map((item, index) => ({ item, index }));
+    items.sort((a, b) => (b.item.mandatory === true) - (a.item.mandatory === true) || a.index - b.index);
+    const shown = items.slice(0, limit).map(({ item }) => ({ text: String(item.requirement), mandatory: item.mandatory === true, status: normalizeStatus(item.status) }));
+    return {
+      total: items.length, hidden: Math.max(0, items.length - shown.length), rows: shown,
+      html: shown.map((row) => `<li><span class="glance-name">${safe(row.text)}${row.mandatory ? ' <span class="detail-required">Required</span>' : ''}</span><span class="status-${row.status.key}">${safe(row.status.label)}</span></li>`).join('')
+    };
+  }
   function firstText(values, fallback) {
     return arr(values).find((value) => String(value || '').trim()) || fallback;
   }
@@ -248,6 +259,48 @@
   function contextCandidate(report) {
     const profile = report?.profileSummary || {};
     return { name: profile.name || 'Candidate profile', meta: [profile.degree, profile.university].filter(Boolean).join(' · ') || notAvailable() };
+  }
+  // What the report header and context row say about the opportunity and candidate. The role and organisation arrive with the
+  // supporting details (the second request), so until then the header must say that it is still reading them instead of
+  // showing a generic stand-in that later changes identity. `status` is the supporting-details state: 'loading', 'error',
+  // 'unavailable' (restored from history without details) or undefined (ready).
+  function reportHeader(report, status) {
+    const role = report?.opportunitySummary?.role || report?.opportunityName || '';
+    const organization = report?.opportunitySummary?.organization || '';
+    const deadline = report?.opportunitySummary?.deadline || '';
+    const profile = report?.profileSummary || {};
+    const candidateMeta = [profile.degree, profile.university].filter(Boolean).join(' · ');
+    const pending = status === 'loading' && !role;
+    const missing = (status === 'error' || status === 'unavailable') && !role;
+    if (pending) {
+      return {
+        pending: true, title: 'Reading opportunity details…', subtitle: 'Your assessment is ready. The opportunity and candidate details are still loading.',
+        opportunity: 'Reading opportunity details…', opportunityMeta: 'Loading…',
+        candidate: profile.name || 'Loading candidate information…', candidateMeta: profile.name ? (candidateMeta || notAvailable()) : 'Loading…'
+      };
+    }
+    if (missing) {
+      return {
+        pending: false, title: 'Fit brief', subtitle: 'Opportunity details are not available for this report.',
+        opportunity: 'Opportunity details unavailable', opportunityMeta: 'Not saved with this analysis',
+        candidate: profile.name || 'Candidate details unavailable', candidateMeta: candidateMeta || 'Not saved with this analysis'
+      };
+    }
+    const name = role || 'Eligibility assessment';
+    const org = organization || 'Opportunity';
+    return {
+      pending: false, title: name, subtitle: `${org} · evidence-based candidate analysis`,
+      opportunity: name, opportunityMeta: [organization || 'Opportunity', deadline].filter(Boolean).join(' · ') || 'Opportunity brief analyzed',
+      candidate: profile.name || 'Candidate profile', candidateMeta: candidateMeta || notAvailable()
+    };
+  }
+  // The saved-report label: the opportunity's role once the details exist, otherwise the neutral stand-in the store already uses.
+  function historyTitle(report) { return report?.opportunitySummary?.role || report?.opportunityName || 'Analysis'; }
+  // The strip under the report toolbar that separates the finished assessment from the supporting details generated after it.
+  function narrativeBanner(status) {
+    if (status === 'loading') return { kind: 'loading', text: 'Assessment ready. Generating strengths, gaps, documents and resources…', canRetry: false };
+    if (status === 'error') return { kind: 'error', text: 'The supporting details could not be prepared. Your assessment above is unaffected.', canRetry: true };
+    return null;
   }
   function detailRequirement(x) {
     const status = normalizeStatus(x.status);
@@ -365,7 +418,7 @@
     const counts = statusCounts(report);
     if (module === 'requirements') {
       const match = requirementsMatch(report);
-      const matchHtml = match ? `<div class="detail-summary"><b>Requirements match:</b> ${safe(requirementsMatchText(report))}. Eligibility depends only on the hard requirements; this count covers every listed requirement.${match.fitExplanation ? `<br><b>Fit score:</b> ${safe(match.fitExplanation)}` : ''}${match.evidenceExplanation ? `<br><b>Evidence coverage:</b> ${safe(match.evidenceExplanation)}` : ''}</div>` : '';
+      const matchHtml = match ? `<details class="how-scored"><summary>How this is scored</summary><div class="detail-summary"><b>Requirements match:</b> ${safe(requirementsMatchText(report))}. Eligibility depends only on the hard requirements; this count covers every listed requirement.${match.fitExplanation ? `<br><b>Fit score:</b> ${safe(match.fitExplanation)}` : ''}${match.evidenceExplanation ? `<br><b>Evidence coverage:</b> ${safe(match.evidenceExplanation)}` : ''}</div></details>` : '';
       return { title: 'Requirements', subtitle: `${counts.met} of ${counts.total || 0} mapped requirements matched`, html: `<div class="detail-summary">Each item connects the opportunity requirement to the evidence Nova found in the supplied profile.</div>${matchHtml}<div class="detail-list">${counts.items.length ? counts.items.map(detailRequirement).join('') : '<span class="empty">No requirements were identified.</span>'}</div>` };
     }
     if (module === 'strengths') {
@@ -564,7 +617,7 @@
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
-    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate,
+    statusCounts, requirementsGlance, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate, reportHeader, narrativeBanner, historyTitle,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
     hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,

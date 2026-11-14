@@ -9,7 +9,7 @@ const $$ = (selector) => document.querySelectorAll(selector);
 // Pure report logic lives in report-model.js (loaded before this file) so it can be unit-tested.
 const {
   safe, arr, notAvailable, numberOrNull, adaptNovaReport, friendlyError, list, presentationText,
-  humanizeVerdict, statusCounts, biggestConcern, nextBestAction, contextCandidate, moduleContent,
+  humanizeVerdict, statusCounts, requirementsGlance, biggestConcern, nextBestAction, reportHeader, narrativeBanner, historyTitle, moduleContent,
   buildAssessmentPayload, mergeNarrative, hasInsights,
   hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,
   HISTORY_KEY, normalizeHistory, addHistoryEntry, removeHistoryEntry
@@ -138,7 +138,8 @@ function countTo(element, target, suffix = '', duration = 650) {
     return;
   }
   const finalText = `${target}${suffix}`;
-  element.setAttribute('aria-label', finalText);
+  // role="img" lets the label stand in for the number while it counts up, so a screen reader hears the final score once.
+  element.setAttribute('aria-label', `Fit score ${finalText} out of 100`);
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     element.textContent = finalText;
     return;
@@ -153,20 +154,37 @@ function countTo(element, target, suffix = '', duration = 650) {
   requestAnimationFrame(tick);
 }
 
+// An inline message under a field: unlike a toast it stays until the problem is fixed, and screen readers hear it.
+function fieldMessage(field, text, kind = 'info') {
+  const element = $(field === profileInput ? '#profileMessage' : '#opportunityMessage');
+  if (!element) return;
+  element.textContent = text || '';
+  element.hidden = !text;
+  element.dataset.kind = text ? kind : '';
+}
+let profileSource = null; // file name of an uploaded resume, shown with the profile status
 function counts() {
   const pc = $('#profileCount');
   const oc = $('#opportunityCount');
   if (pc) pc.textContent = `${profileInput.value.length.toLocaleString()} / 8,000`;
   if (oc) oc.textContent = `${opportunityInput.value.length.toLocaleString()} / 12,000`;
-  const profileState = $('#profileState');
-  const opportunityState = $('#opportunityState');
-  if (profileState) {
-    profileState.textContent = profileInput.value.trim() ? 'Profile ready' : 'Waiting for profile';
-    profileState.classList.toggle('ready', Boolean(profileInput.value.trim()));
+  for (const [element, field] of [[pc, profileInput], [oc, opportunityInput]]) {
+    const max = Number(field.maxLength);
+    element?.classList.toggle('near-limit', field.value.length >= max * 0.9);
   }
-  if (opportunityState) {
-    opportunityState.textContent = opportunityInput.value.trim() ? 'Brief ready' : 'Waiting for opportunity';
-    opportunityState.classList.toggle('ready', Boolean(opportunityInput.value.trim()));
+  const MIN_CHARS = 50; // the same minimum runAnalysis enforces
+  const stateText = (value, ready, empty) => {
+    const length = value.trim().length;
+    if (!length) return { text: empty, ready: false };
+    if (length < MIN_CHARS) return { text: `${MIN_CHARS - length} more characters needed`, ready: false };
+    return { text: ready, ready: true };
+  };
+  for (const [selector, field, ready, empty] of [['#profileState', profileInput, 'Profile ready', 'Waiting for profile'], ['#opportunityState', opportunityInput, 'Brief ready', 'Waiting for opportunity']]) {
+    const element = $(selector);
+    if (!element) continue;
+    const state = stateText(field.value, ready, empty);
+    element.textContent = state.ready && field === profileInput && profileSource ? `${state.text} · ${profileSource}` : state.text;
+    element.classList.toggle('ready', state.ready);
   }
 }
 
@@ -177,20 +195,23 @@ function loadSample(kind, { announce = true } = {}) {
   if (announce) toast(`Sample ${kind} loaded.`);
 }
 
+// Explicit scroll options override CSS scroll-behavior, so reduced motion has to be honoured here as well.
+function scrollMode() { return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; }
+
 function showWorkspace({ scroll = true } = {}) {
   document.body.classList.remove('report-mode', 'analysis-mode');
   $('#report')?.classList.add('hidden');
   $('#errorCard')?.classList.add('hidden');
   $('#workspace')?.classList.remove('hidden');
-  if (scroll) $('#workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (scroll) $('#workspace')?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
 }
 
 function loadSampleDecision() {
   showWorkspace({ scroll: false });
   loadSample('profile', { announce: false });
   loadSample('internship', { announce: false });
-  $('#workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  toast('Sample decision loaded.');
+  $('#workspace')?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
+  toast('Sample profile and opportunity loaded. Review them, then build the brief.');
 }
 
 $$('[data-sample]').forEach((button) => {
@@ -199,152 +220,292 @@ $$('[data-sample]').forEach((button) => {
     button.closest('details')?.removeAttribute('open');
   });
 });
-$('#sampleProfile')?.addEventListener('click', () => loadSample('profile'));
-$('#sampleOpportunity')?.addEventListener('click', () => loadSample('internship'));
 $('#sampleDecisionBtn')?.addEventListener('click', loadSampleDecision);
 $('#sampleDecisionHero')?.addEventListener('click', loadSampleDecision);
 profileInput?.addEventListener('input', counts);
 opportunityInput?.addEventListener('input', counts);
 
-function setupPointerGlow() {
-  const zone = $('[data-pointer-zone]');
-  const card = $('[data-pointer-card]');
-  if (!zone || !card || matchMedia('(pointer: coarse)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  zone.addEventListener('pointermove', (event) => {
-    const rect = zone.getBoundingClientRect();
-    const x = `${event.clientX - rect.left}px`;
-    const y = `${event.clientY - rect.top}px`;
-    zone.style.setProperty('--pointer-x', x);
-    zone.style.setProperty('--pointer-y', y);
-    const cardRect = card.getBoundingClientRect();
-    card.style.setProperty('--card-shift-x', `${Math.max(-4, Math.min(4, (event.clientX - (cardRect.left + cardRect.width / 2)) / 90))}px`);
-    card.style.setProperty('--card-shift-y', `${Math.max(-4, Math.min(4, (event.clientY - (cardRect.top + cardRect.height / 2)) / 120))}px`);
-    card.style.setProperty('--card-pointer-x', `${event.clientX - cardRect.left}px`);
-    card.style.setProperty('--card-pointer-y', `${event.clientY - cardRect.top}px`);
-  });
-  zone.addEventListener('pointerleave', () => {
-    zone.style.removeProperty('--pointer-x');
-    zone.style.removeProperty('--pointer-y');
-    card.style.removeProperty('--card-shift-x');
-    card.style.removeProperty('--card-shift-y');
-    card.style.removeProperty('--card-pointer-x');
-    card.style.removeProperty('--card-pointer-y');
-  });
-}
-
+// A fixed, full-page canvas behind everything: a slow constellation that leans toward the pointer, scrolls with the page
+// (parallax), leaves a short trail behind the pointer, and lets the visitor add stars and ripples by clicking open space.
 function setupConstellation() {
   const canvas = $('#constellationField');
-  const zone = $('[data-pointer-zone]');
-  if (!canvas || !zone) return;
+  if (!canvas) return;
   const context = canvas.getContext('2d', { alpha: true });
   if (!context) return;
   const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-  const pointer = { x: -9999, y: -9999, active: false };
+  const coarse = matchMedia('(pointer: coarse)');
+  const hint = $('#constellationHint');
+  const pointer = { x: -9999, y: -9999, active: false, since: 0 };
+  let trail = []; // marks the pointer leaves behind; each drifts up and fades
+  let travel = { x: -9999, y: -9999, since: 0 };
+  let scrollY = window.scrollY;
   let nodes = [];
+  let stars = []; // nodes the visitor adds by clicking; they fade out on their own
+  let ripples = [];
   let width = 0;
   let height = 0;
   let frame = 0;
   let last = 0;
+  const MAX_STARS = 10;
+  const STAR_LIFE = 14000;
+  const RIPPLE_MS = 1000;
+  const RIPPLE_REACH = 300;
+  const GLOW_DECAY = 0.02;
+  const TRAIL_LIFE = 1400;
+  const TRAIL_GAP = 34; // pointer travel between two marks, in px
+  const MAX_TRAIL = 60;
+  const PARALLAX = 0.12; // how far the field moves per px of page scroll, so it feels attached to the page
   const paletteForTheme = () => document.documentElement.dataset.theme === 'light'
-    ? { node: 'rgba(50, 60, 80, 0.95)', line: 'rgba(50, 60, 80, 0.45)', hot: '60, 90, 150', field: 'rgba(60, 90, 150, 0.2)', fieldClear: 'rgba(60, 90, 150, 0)' }
-    : { node: 'rgba(200, 215, 240, 0.95)', line: 'rgba(160, 180, 220, 0.55)', hot: '180, 200, 255', field: 'rgba(180, 200, 255, 0.3)', fieldClear: 'rgba(180, 200, 255, 0)' };
-  const nodeCount = () => Math.min(window.innerWidth < 680 ? 28 : 52, Math.max(18, Math.floor(width / 25)));
+    ? { node: 'rgba(50, 60, 80, 1)', line: 'rgba(50, 60, 80, 0.58)', hot: '60, 90, 150', active: 'rgba(62, 86, 141, 0.7)' }
+    : { node: 'rgba(205, 218, 242, 1)', line: 'rgba(165, 185, 225, 0.7)', hot: '180, 200, 255', active: 'rgba(209, 220, 242, 0.9)' };
+  const nodeCount = () => Math.min(coarse.matches ? 36 : 84, Math.max(22, Math.floor((width * height) / 18000)));
+  // Text and cards: static lines and nodes inside these are drawn faintly so the field never competes with copy.
+  const QUIET_SELECTOR = '.hero-copy, .sample-decision, .trust-strip, .input-card, .decision-hero, .report-context, .requirements-glance, .module-grid, .supplemental-grid, .preparation-details, .history-card, .loading-panel, .error-card';
+  let quiet = [];
+  let quietDirty = true;
+  const measureQuiet = () => {
+    quiet = [...$$(QUIET_SELECTOR)].filter((el) => el.offsetParent !== null).map((el) => el.getBoundingClientRect())
+      .filter((r) => r.bottom > -12 && r.top < height + 12)
+      .map((r) => ({ left: r.left - 12, right: r.right + 12, top: r.top - 12, bottom: r.bottom + 12 }));
+    quietDirty = false;
+  };
+  const inQuiet = (p) => quiet.some((r) => p.x > r.left && p.x < r.right && p.y > r.top && p.y < r.bottom);
+  const QUIET_ALPHA = 0.2;
+  const LIVE_QUIET_ALPHA = 0.55; // interaction stays visible over text, at reduced strength
+  const makeNode = (x, y, extra = {}) => ({ x, y, vx: (Math.random() - 0.5) * 0.035, vy: (Math.random() - 0.5) * 0.035, phase: Math.random() * Math.PI * 2, ox: 0, oy: 0, ovx: 0, ovy: 0, glow: 0, ...extra });
+  const at = (node) => ({ x: node.x + node.ox, y: node.y + node.oy });
+
   function resize() {
     const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
-    const rect = zone.getBoundingClientRect();
-    width = rect.width;
-    height = rect.height;
+    width = window.innerWidth;
+    height = window.innerHeight;
     canvas.width = Math.floor(width * ratio);
     canvas.height = Math.floor(height * ratio);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    nodes = Array.from({ length: nodeCount() }, (_, index) => {
-      const previous = nodes[index];
-      return previous || { x: Math.random() * width, y: Math.random() * height, vx: (Math.random() - 0.5) * 0.035, vy: (Math.random() - 0.5) * 0.035, phase: Math.random() * Math.PI * 2 };
-    });
+    nodes = Array.from({ length: nodeCount() }, (_, index) => nodes[index] || makeNode(Math.random() * width, Math.random() * height));
+    quietDirty = true;
     draw(0);
   }
+
+  function step(node, time, movement, interactive) {
+    node.x += node.vx * movement;
+    node.y += node.vy * movement;
+    if (node.x < -20) node.x = width + 20;
+    if (node.x > width + 20) node.x = -20;
+    if (node.y < -20) node.y = height + 20;
+    if (node.y > height + 20) node.y = -20;
+    if (!reduce.matches) {
+      node.x += Math.cos(time * 0.00018 + node.phase) * 0.03;
+      node.y += Math.sin(time * 0.00016 + node.phase) * 0.03;
+    }
+    if (!interactive) return;
+    // Interaction moves a node by an offset that springs back to rest, so nothing snaps or drifts away for good.
+    let targetX = 0;
+    let targetY = 0;
+    if (pointer.active) {
+      const dx = pointer.x - (node.x + node.ox);
+      const dy = pointer.y - (node.y + node.oy);
+      const distance = Math.hypot(dx, dy);
+      if (distance > 0 && distance < 230) {
+        const lean = distance < 70 ? -(70 - distance) / 70 * 26 : Math.sin((distance - 70) / 160 * Math.PI) * 30;
+        targetX = dx / distance * lean;
+        targetY = dy / distance * lean;
+      }
+    }
+    node.ovx = (node.ovx + (targetX - node.ox) * 0.035) * 0.86;
+    node.ovy = (node.ovy + (targetY - node.oy) * 0.035) * 0.86;
+    node.glow = Math.max(0, node.glow - GLOW_DECAY);
+    for (const ripple of ripples) {
+      const age = (time - ripple.born) / RIPPLE_MS;
+      const p = at(node);
+      const away = Math.hypot(p.x - ripple.x, p.y - ripple.y) || 1;
+      const gap = away - age * RIPPLE_REACH;
+      if (Math.abs(gap) < 30 && age < 1) {
+        const push = (1 - Math.abs(gap) / 30) * (1 - age) * 1.6;
+        node.ovx += (p.x - ripple.x) / away * push;
+        node.ovy += (p.y - ripple.y) / away * push;
+        node.glow = 1;
+      }
+    }
+    node.ox += node.ovx;
+    node.oy += node.ovy;
+  }
+  function starFade(node, time) {
+    if (!node.born) return 1;
+    const age = time - node.born;
+    return Math.min(1, age / 500, (STAR_LIFE - age) / 3000);
+  }
+
+  function drawTrail(time, palette) {
+    trail = trail.filter((mark) => time - mark.born < TRAIL_LIFE);
+    canvas.dataset.trail = String(trail.length);
+    for (const mark of trail) {
+      const life = (time - mark.born) / TRAIL_LIFE;
+      const ease = 1 - life * life;
+      const y = mark.y - life * 26;
+      const calm = inQuiet(mark) ? 0.55 : 1;
+      context.fillStyle = `rgba(${palette.hot}, ${0.75 * ease * calm})`;
+      context.beginPath();
+      context.arc(mark.x + Math.sin(mark.phase + life * 4) * 3, y, mark.size * (1 - life * 0.5), 0, Math.PI * 2);
+      context.fill();
+      if (mark.size > 2) {
+        context.strokeStyle = `rgba(${palette.hot}, ${0.35 * ease * calm})`;
+        context.lineWidth = 1;
+        context.beginPath();
+        context.arc(mark.x, y, mark.size + life * 14, 0, Math.PI * 2);
+        context.stroke();
+      }
+    }
+  }
+
   function draw(time) {
     const delta = Math.min(32, time - last || 16);
     last = time;
     const palette = paletteForTheme();
+    if (quietDirty) measureQuiet();
     context.clearRect(0, 0, width, height);
-    if (pointer.active) {
-      const gradient = context.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, Math.min(240, width * 0.35));
-      gradient.addColorStop(0, palette.field);
-      gradient.addColorStop(1, palette.fieldClear);
-      context.fillStyle = gradient;
-      context.fillRect(0, 0, width, height);
-    }
     const movement = reduce.matches ? 0 : delta;
-    nodes.forEach((node) => {
-      node.x += node.vx * movement;
-      node.y += node.vy * movement;
-      if (node.x < -20) node.x = width + 20;
-      if (node.x > width + 20) node.x = -20;
-      if (node.y < -20) node.y = height + 20;
-      if (node.y > height + 20) node.y = -20;
-      if (!reduce.matches) {
-        node.x += Math.cos(time * 0.00018 + node.phase) * 0.03;
-        node.y += Math.sin(time * 0.00016 + node.phase) * 0.03;
-      }
-      if (pointer.active && !reduce.matches) {
-        const dx = node.x - pointer.x;
-        const dy = node.y - pointer.y;
-        const distance = Math.hypot(dx, dy);
-        if (distance < 200 && distance > 0) {
-          const push = (200 - distance) / 200 * 0.45;
-          node.x += dx / distance * push;
-          node.y += dy / distance * push;
-        }
-      }
-    });
-    for (let i = 0; i < nodes.length; i += 1) {
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const a = nodes[i];
-        const b = nodes[j];
+    const interactive = !reduce.matches;
+    stars = stars.filter((star) => time - star.born < STAR_LIFE);
+    ripples = ripples.filter((ripple) => time - ripple.born < RIPPLE_MS);
+    const all = [...nodes, ...stars];
+    all.forEach((node) => step(node, time, movement, interactive));
+
+    for (let i = 0; i < all.length; i += 1) {
+      for (let j = i + 1; j < all.length; j += 1) {
+        const a = at(all[i]);
+        const b = at(all[j]);
         const distance = Math.hypot(a.x - b.x, a.y - b.y);
-        if (distance > 142) continue;
+        if (distance > 160) continue;
         const proximity = pointer.active ? Math.max(0, 1 - Math.hypot((a.x + b.x) / 2 - pointer.x, (a.y + b.y) / 2 - pointer.y) / 180) : 0;
+        const fade = Math.max(starFade(all[i], time), 0) * Math.max(starFade(all[j], time), 0);
         context.strokeStyle = proximity > 0.05 ? `rgba(${palette.hot}, ${0.1 + proximity * 0.24})` : palette.line;
-        context.lineWidth = proximity > 0.05 ? 2.0 : 1.2;
+        context.lineWidth = proximity > 0.05 ? 1.6 : 1;
+        const calm = inQuiet(a) || inQuiet(b);
+        context.globalAlpha = (calm ? (proximity > 0.05 ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * fade * (1 - distance / 240);
         context.beginPath();
         context.moveTo(a.x, a.y);
         context.lineTo(b.x, b.y);
         context.stroke();
       }
     }
-    nodes.forEach((node) => {
-      const distance = pointer.active ? Math.hypot(node.x - pointer.x, node.y - pointer.y) : 9999;
-      const active = distance < 140;
-      context.fillStyle = active ? (document.documentElement.dataset.theme === 'light' ? 'rgba(62, 86, 141, 0.65)' : 'rgba(209, 220, 242, 0.84)') : palette.node;
+
+    // The pointer is a node too: it tethers to the nearest few stars.
+    if (pointer.active && interactive) {
+      const near = all.map((node) => ({ p: at(node) }))
+        .map((entry) => ({ ...entry, d: Math.hypot(entry.p.x - pointer.x, entry.p.y - pointer.y) }))
+        .filter((entry) => entry.d < 190).sort((x, y) => x.d - y.d).slice(0, 5);
+      near.forEach(({ p, d }) => {
+        context.strokeStyle = `rgba(${palette.hot}, ${0.55 * (1 - d / 190)})`;
+        context.lineWidth = 1.2;
+        context.globalAlpha = inQuiet(p) ? LIVE_QUIET_ALPHA : 1;
+        context.beginPath();
+        context.moveTo(pointer.x, pointer.y);
+        context.lineTo(p.x, p.y);
+        context.stroke();
+      });
+    }
+    context.globalAlpha = 1;
+
+    ripples.forEach((ripple) => {
+      const age = (time - ripple.born) / RIPPLE_MS;
+      context.strokeStyle = `rgba(${palette.hot}, ${0.42 * (1 - age)})`;
+      context.lineWidth = 1.4;
       context.beginPath();
-      context.arc(node.x, node.y, active ? 4.5 : 2.5, 0, Math.PI * 2);
+      context.arc(ripple.x, ripple.y, age * RIPPLE_REACH, 0, Math.PI * 2);
+      context.stroke();
+    });
+
+    all.forEach((node) => {
+      const p = at(node);
+      const distance = pointer.active ? Math.hypot(p.x - pointer.x, p.y - pointer.y) : 9999;
+      const active = distance < 140 || node.glow > 0.05;
+      context.fillStyle = active ? palette.active : palette.node;
+      context.globalAlpha = (inQuiet(p) ? (active ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * Math.max(starFade(node, time), 0);
+      context.beginPath();
+      context.arc(p.x, p.y, (active ? 4 : 2.2) + node.glow * 2.5 + (node.born ? 0.8 : 0), 0, Math.PI * 2);
       context.fill();
     });
+    context.globalAlpha = 1;
+
+    if (interactive) drawTrail(time, palette);
     if (!reduce.matches && !document.hidden) frame = requestAnimationFrame(draw);
   }
+
   function start() { cancelAnimationFrame(frame); frame = requestAnimationFrame(draw); }
   function stop() { cancelAnimationFrame(frame); frame = 0; }
   function onPointerMove(event) {
-    const rect = zone.getBoundingClientRect();
-    pointer.x = event.clientX - rect.left;
-    pointer.y = event.clientY - rect.top;
-    pointer.active = true;
-    if (!reduce.matches && !document.hidden && !frame) start();
+    pointer.x = event.clientX; pointer.y = event.clientY; pointer.active = true;
+    if (reduce.matches) return;
+    // Leave a mark every TRAIL_GAP px of travel (denser while the button is held), never a mark per event.
+    const moved = Math.hypot(pointer.x - travel.x, pointer.y - travel.y);
+    const gap = event.buttons ? TRAIL_GAP / 2 : TRAIL_GAP;
+    if (moved > gap) {
+      travel = { x: pointer.x, y: pointer.y, since: performance.now() };
+      trail.push({ x: pointer.x, y: pointer.y, born: travel.since, size: event.buttons ? 2.6 + Math.random() * 1.6 : 1.4 + Math.random() * 1.4, phase: Math.random() * Math.PI * 2 });
+      if (trail.length > MAX_TRAIL) trail.shift();
+      canvas.dataset.trail = String(trail.length);
+    }
+    if (!document.hidden && !frame) start();
+  }
+  function onScroll() {
+    const next = window.scrollY;
+    const shift = (next - scrollY) * PARALLAX;
+    scrollY = next;
+    quietDirty = true;
+    if (reduce.matches || !shift) return;
+    for (const node of nodes) {
+      node.y -= shift;
+      if (node.y < -20) node.y += height + 40;
+      if (node.y > height + 20) node.y -= height + 40;
+    }
+    for (const star of stars) star.y -= shift;
+    for (const mark of trail) mark.y -= shift;
+    if (!document.hidden && !frame) start();
   }
   function onPointerLeave() { pointer.active = false; }
+  // Click or tap on open space: a ripple pushes the nearby stars, and a new star joins the web for a while.
+  const SOLID = 'a, button, summary, input, textarea, select, label, details, dialog, header, p, h1, h2, h3, li, table, [data-pointer-card], .input-card, .report, .history-card';
+  function onPointerDown(event) {
+    if (reduce.matches || event.button > 0 || !(event.target instanceof Element) || event.target.closest(SOLID)) return;
+    const x = event.clientX; const y = event.clientY;
+    const now = performance.now();
+    ripples.push({ x, y, born: now });
+    stars.push(makeNode(x, y, { born: now }));
+    if (stars.length > MAX_STARS) stars.shift();
+    canvas.dataset.stars = String(stars.length);
+    hint?.classList.add('is-used');
+    pointer.x = x; pointer.y = y; pointer.active = true;
+    if (!frame) start();
+  }
+  function onPointerUp(event) { if (event.pointerType === 'touch') pointer.active = false; }
+
   resize();
-  zone.addEventListener('pointermove', onPointerMove, { passive: true });
-  zone.addEventListener('pointerleave', onPointerLeave, { passive: true });
+  if (hint) {
+    hint.textContent = coarse.matches ? 'Tap the background to add a star' : 'Click the background to add a star';
+    hint.hidden = reduce.matches;
+  }
+  canvas.dataset.stars = '0';
+  document.addEventListener('pointermove', onPointerMove, { passive: true });
+  document.documentElement.addEventListener('pointerleave', onPointerLeave, { passive: true });
+  document.addEventListener('pointerdown', onPointerDown, { passive: true });
+  document.addEventListener('pointerup', onPointerUp, { passive: true });
   window.addEventListener('resize', resize, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  new MutationObserver(() => { quietDirty = true; }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); else if (!reduce.matches) start(); });
-  reduce.addEventListener?.('change', () => { resize(); if (reduce.matches) stop(); else start(); });
+  reduce.addEventListener?.('change', () => { if (hint) hint.hidden = reduce.matches; ripples = []; stars = []; trail = []; resize(); if (reduce.matches) stop(); else start(); });
   const themeObserver = new MutationObserver(() => draw(performance.now()));
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   if (!reduce.matches) start();
 }
+
+// The sample menu is a <details>: close it on Escape (returning focus to its button) and when the user clicks elsewhere.
+const sampleMenu = $('.sample-menu');
+sampleMenu?.addEventListener('keydown', (event) => { if (event.key === 'Escape' && sampleMenu.open) { sampleMenu.open = false; sampleMenu.querySelector('summary')?.focus(); } });
+document.addEventListener('click', (event) => { if (sampleMenu?.open && !sampleMenu.contains(event.target)) sampleMenu.open = false; });
 
 if ($('#themeToggle')) {
   $('#themeToggle').setAttribute('aria-pressed', String(document.documentElement.dataset.theme === 'dark'));
@@ -393,51 +554,65 @@ async function addResumeFile(file) {
   const fileName = file.name.toLowerCase();
   const isPdf = file.type === 'application/pdf' || fileName.endsWith('.pdf');
   const isText = file.type.startsWith('text/') || /\.(txt|md)$/i.test(fileName);
-  if (!isPdf && !isText) {
-    toast('Please upload a TXT, Markdown, or PDF resume.');
-    return;
-  }
-  if (f.size > 2000000) {
-    toast('File is too large. Please choose a file smaller than 2 MB.');
-    return;
-  }
+  const fail = (message) => { fieldMessage(profileInput, message, 'error'); toast(message); };
+  const LIMIT = 8000; // keep in step with the textarea maxlength (asserted by test/quality.test.js)
+  // Loads extracted text into the profile and says plainly if the field limit cut any of it off.
+  const accept = (text, label) => {
+    profileInput.value = text.slice(0, 8000);
+    profileSource = file.name;
+    counts();
+    profileInput.removeAttribute('aria-invalid');
+    if (text.length > LIMIT) {
+      fieldMessage(profileInput, `${file.name} has ${text.length.toLocaleString()} characters. Only the first ${LIMIT.toLocaleString()} were kept; check that what matters is included.`, 'warning');
+      toast(`${label} Only the first ${LIMIT.toLocaleString()} characters were kept.`, 5000);
+    } else {
+      fieldMessage(profileInput, '');
+      toast(label);
+    }
+  };
+  if (!isPdf && !isText) { fail('Please upload a TXT, Markdown, or PDF resume.'); return; }
+  if (f.size > 2000000) { fail('File is too large. Please choose a file smaller than 2 MB.'); return; }
   if (isPdf) {
     toast('Reading PDF…');
     const text = await extractTextFromPDF(file);
-    if (text && text.length > 10) {
-      profileInput.value = text.slice(0, 8000);
-      counts();
-      toast(`Resume extracted from PDF (${text.length.toLocaleString()} characters).`);
-    } else if (text !== null) {
-      toast('PDF appears empty or image-based. Paste your resume text instead.');
-    }
+    if (text && text.length > 10) accept(text, `Resume extracted from PDF (${text.length.toLocaleString()} characters).`);
+    else if (text !== null) fail('This PDF looks empty or image-based. Paste your resume text instead.');
     return;
   }
-  if (file.size > 500000) {
-    toast('Choose a text file smaller than 500 KB.');
-    return;
-  }
+  if (file.size > 500000) { fail('Choose a text file smaller than 500 KB.'); return; }
   try {
-    profileInput.value = (await file.text()).slice(0, 8000);
-    counts();
-    toast('Resume added and ready for analysis.');
+    accept(await file.text(), 'Resume added and ready for analysis.');
   } catch {
-    toast('Could not read this file. Please try a different format.');
+    fail('Could not read this file. Please try a different format.');
   }
 }
 
-[profileInput, opportunityInput].forEach((field) => field?.addEventListener('input', () => field.removeAttribute('aria-invalid')));
-$('#resumeUpload')?.addEventListener('change', (event) => addResumeFile(event.target.files?.[0]));
+[profileInput, opportunityInput].forEach((field) => field?.addEventListener('input', () => {
+  field.removeAttribute('aria-invalid');
+  if (field === profileInput && !field.value.trim()) { profileSource = null; counts(); }
+  const atLimit = field.value.length >= Number(field.maxLength);
+  fieldMessage(field, atLimit ? `Limit of ${Number(field.maxLength).toLocaleString()} characters reached. Anything beyond it is not kept.` : '', 'warning');
+}));
+$('#resumeUpload')?.addEventListener('change', (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = ''; // choosing the same file again must still fire a change
+  addResumeFile(file);
+});
 $$('.input-card').forEach((card) => {
-  card.addEventListener('dragover', (event) => { event.preventDefault(); card.classList.add('drag-over'); });
-  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  const accepts = card.id === 'profileCard';
+  let depth = 0; // dragenter/dragleave fire for every child element, so count them to avoid flicker
+  card.addEventListener('dragenter', () => { depth += 1; if (accepts) card.classList.add('drag-over'); });
+  card.addEventListener('dragover', (event) => { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = accepts ? 'copy' : 'none'; });
+  card.addEventListener('dragleave', () => { depth = Math.max(0, depth - 1); if (!depth) card.classList.remove('drag-over'); });
   card.addEventListener('drop', (event) => {
     event.preventDefault();
+    depth = 0;
     card.classList.remove('drag-over');
+    // A resume only ever belongs in the profile box; dropping it on the opportunity box must not silently replace the profile.
+    if (!accepts) { if (event.dataTransfer.files?.length) toast('Drop your resume on the profile box. Paste the opportunity text here.'); return; }
     addResumeFile(event.dataTransfer.files?.[0]);
   });
 });
-
 
 function loading(show) {
   $('#loadingPanel')?.classList.toggle('hidden', !show);
@@ -482,6 +657,7 @@ async function runAnalysis() {
   const rejectInput = (fields, message) => {
     fields.forEach((field) => field.setAttribute('aria-invalid', 'true'));
     fields[0].focus(); // take keyboard and screen-reader users to the problem, not just a toast
+    fieldMessage(fields[0], message, 'error');
     toast(message);
   };
   const missing = [profileInput, opportunityInput].filter((field) => !field.value.trim());
@@ -494,9 +670,10 @@ async function runAnalysis() {
   latestReportSaved = false;
   latestHistoryId = null;
   startLoading();
-  abortController = new AbortController();
+  const controller = new AbortController();
+  abortController = controller;
   try {
-    const data = await postJson('/api/analyze', { profile, opportunity }, { signal: abortController.signal, timeoutMs: ANALYZE_TIMEOUT_MS });
+    const data = await postJson('/api/analyze', { profile, opportunity }, { signal: controller.signal, timeoutMs: ANALYZE_TIMEOUT_MS });
     if (!data?.response) throw new UserFacingError('The analysis returned no result. Please try again.');
     renderReport(adaptNovaReport(data), { save: true, inputs: { profile, opportunity } });
   } catch (error) {
@@ -509,12 +686,16 @@ async function runAnalysis() {
     $('#errorCard')?.classList.remove('hidden');
     window.requestAnimationFrame(() => $('#errorTitle')?.focus({ preventScroll: true }));
   } finally {
-    abortController = null;
-    stopLoading();
+    // A cancelled run has already been cleaned up; it must not tear down a newer analysis that started after the cancel.
+    if (abortController === controller) {
+      abortController = null;
+      stopLoading();
+    }
   }
 }
 $('#analyzeBtn')?.addEventListener('click', runAnalysis);
 $('#retryBtn')?.addEventListener('click', runAnalysis);
+$('#narrativeRetry')?.addEventListener('click', () => loadSection('insights'));
 $('#cancelLoading')?.addEventListener('click', () => {
   abortController?.abort();
   abortController = null;
@@ -536,7 +717,19 @@ function setHTML(selector, html) {
 const dialog = $('#analysisDialog');
 let activeModule = null;
 function closeDialog() { activeModule = null; if (dialog?.open) dialog.close(); }
+const MODULE_ORDER = [['requirements', 'Evidence'], ['risks', 'Blockers'], ['strategy', 'Next moves'], ['strengths', 'Strengths & weaknesses'], ['gaps', 'Gaps'], ['documents', 'Documents'], ['resources', 'Resources']];
+function paintModuleNav(module) {
+  const index = MODULE_ORDER.findIndex(([name]) => name === module);
+  for (const [id, offset, arrow] of [['#dialogPrev', -1, '←'], ['#dialogNext', 1, '→']]) {
+    const target = MODULE_ORDER[(index + offset + MODULE_ORDER.length) % MODULE_ORDER.length];
+    const button = $(id);
+    if (!button) continue;
+    button.dataset.target = target[0];
+    button.textContent = offset < 0 ? `${arrow} ${target[1]}` : `${target[1]} ${arrow}`;
+  }
+}
 function paintModule(module) {
+  paintModuleNav(module);
   const content = moduleContent(module, latestReport, uiState());
   setText('#dialogTitle', content.title);
   setText('#dialogSubtitle', content.subtitle);
@@ -565,7 +758,7 @@ $('#dialogContent')?.addEventListener('click', (event) => {
 });
 $$('[data-module]').forEach((button) => button.addEventListener('click', () => openModule(button.dataset.module)));
 $('#viewAnalysisBtn')?.addEventListener('click', () => {
-  $('#moduleGrid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('#moduleGrid')?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
   $('#moduleGrid [data-module="requirements"]')?.focus();
 });
 $('#editInputsBtn')?.addEventListener('click', () => {
@@ -573,6 +766,15 @@ $('#editInputsBtn')?.addEventListener('click', () => {
   profileInput?.focus({ preventScroll: true });
 });
 $('#dialogClose')?.addEventListener('click', closeDialog);
+['#dialogPrev', '#dialogNext'].forEach((id) => $(id)?.addEventListener('click', (event) => {
+  const target = event.currentTarget.dataset.target;
+  if (!target || !latestReport) return;
+  activeModule = target;
+  paintModule(target);
+  $('#dialogContent').scrollTop = 0;
+  setText('#liveStatus', '');
+  announce(`${$('#dialogTitle').textContent} opened.`);
+}));
 dialog?.addEventListener('click', (event) => { if (event.target === dialog) closeDialog(); });
 dialog?.addEventListener('cancel', closeDialog);
 
@@ -590,7 +792,7 @@ function renderHistory() {
     const entry = historyEntries().find((item) => String(item.id) === String(button.dataset.history));
     if (!entry) { renderHistory(); toast('That saved analysis has expired or was removed.'); return; }
     renderReport(entry.report, { save: false });
-    $('#report')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('#report')?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
   }));
   $$('[data-history-remove]').forEach((button) => button.addEventListener('click', () => {
     writeHistory(removeHistoryEntry(historyEntries(), button.dataset.historyRemove));
@@ -610,7 +812,7 @@ function writeHistory(entries) {
   else storage.remove(HISTORY_KEY);
 }
 function saveHistory(report) {
-  const title = report?.opportunitySummary?.role || report?.opportunityName || 'Analysis';
+  const title = historyTitle(report);
   const entry = { id: Date.now(), title, score: numberOrNull(report?.overallMatchScore), verdict: humanizeVerdict(report?.eligibilityVerdict || 'Analysis'), timestamp: new Date().toLocaleString(), report };
   writeHistory(addHistoryEntry(historyEntries(), entry, entry.id));
   return entry.id;
@@ -621,7 +823,8 @@ function updateHistory(id, report) {
   const index = entries.findIndex((item) => item.id === id);
   if (index === -1) return; // deleted or expired meanwhile: never resurrect it
   // Spread keeps savedAt/expiresAt: editing an entry does not extend how long it is kept.
-  entries[index] = { ...entries[index], score: numberOrNull(report?.overallMatchScore), report };
+  const title = historyTitle(report);
+  entries[index] = { ...entries[index], ...(title === 'Analysis' ? {} : { title }), score: numberOrNull(report?.overallMatchScore), report };
   writeHistory(entries);
 }
 $('#clearHistory')?.addEventListener('click', () => { storage.remove(HISTORY_KEY); renderHistory(); toast('History cleared from this device.'); });
@@ -639,25 +842,35 @@ function uiState() {
   if (!state.insights && latestReport && !hasInsights(latestReport)) state.insights = narrative.inputs ? 'loading' : 'unavailable';
   return state;
 }
+function renderNarrativeBanner(status) {
+  const banner = $('#narrativeBanner');
+  if (!banner) return;
+  const state = narrativeBanner(status);
+  banner.classList.toggle('hidden', !state);
+  banner.dataset.kind = state?.kind || '';
+  setText('#narrativeBannerText', state?.text || '');
+  const retry = $('#narrativeRetry');
+  if (retry) retry.hidden = !state?.canRetry;
+}
 function renderInsightPanels() {
   const report = latestReport || {};
-  const candidate = contextCandidate(report);
-  const role = report.opportunitySummary?.role || report.opportunityName || 'Eligibility assessment';
-  const organization = report.opportunitySummary?.organization || 'Opportunity';
-  setText('#reportTitle', role);
-  setText('#reportSubtitle', `${organization} · evidence-based candidate analysis`);
-  setText('#contextOpportunity', role);
-  setText('#contextOpportunityMeta', [organization, report.opportunitySummary?.deadline].filter(Boolean).join(' · ') || 'Opportunity brief analyzed');
-  setText('#contextCandidate', candidate.name);
-  setText('#contextCandidateMeta', candidate.meta);
-  const pending = ['loading', 'error', 'unavailable'].includes(uiState().insights);
   const status = uiState().insights;
+  const header = reportHeader(report, status);
+  setText('#reportTitle', header.title);
+  setText('#reportSubtitle', header.subtitle);
+  setText('#contextOpportunity', header.opportunity);
+  setText('#contextOpportunityMeta', header.opportunityMeta);
+  setText('#contextCandidate', header.candidate);
+  setText('#contextCandidateMeta', header.candidateMeta);
+  $('#report')?.classList.toggle('details-pending', status === 'loading');
+  renderNarrativeBanner(status);
+  const pending = ['loading', 'error', 'unavailable'].includes(status);
   const countsData = statusCounts(report);
   const strengths = arr(report.strengths);
   const gaps = arr(report.missingSkills);
   const risks = arr(report.riskAnalysis);
   const documents = NovaReport.documentGroups(report);
-  const waiting = { loading: 'Preparing…', error: 'Could not be prepared · Open to retry', unavailable: 'Not saved with this analysis' }[status];
+  const waiting = { loading: 'Generating…', error: 'Could not be prepared · Open to retry', unavailable: 'Not saved with this analysis' }[status];
 
   setText('#moduleRequirementsMeta', countsData.total ? `${countsData.met} / ${countsData.total} matched · View evidence` : 'No requirements mapped');
   if (pending) {
@@ -735,6 +948,7 @@ async function loadSection(section) {
     window.latestReport = latestReport;
     delete narrative.status[section];
     updateHistory(latestHistoryId, latestReport);
+    renderHistory();
     announce({ insights: 'Analysis details are ready.', coverLetter: 'Cover letter is ready.', interview: 'Interview preparation is ready.' }[section] || 'Section is ready.');
   } catch (error) {
     if (error?.name === 'AbortError' || run !== narrative.runId) return;
@@ -768,6 +982,12 @@ function renderReport(report, { save = false, inputs = null } = {}) {
   $('#decisionRequirements')?.setAttribute('title', match?.fitExplanation || '');
   $('#decisionConfidence')?.setAttribute('title', match?.evidenceExplanation || 'Share of requirement statuses that rest on a quote verified in your profile. Not confidence in the verdict.');
   setText('#contextReadiness', latestReport.readinessCategory ? presentationText(latestReport.readinessCategory) : (readiness === null ? notAvailable() : `${readiness}% ready`));
+  const glance = requirementsGlance(latestReport);
+  setHTML('#glanceList', glance.html);
+  const more = $('#glanceMore');
+  if (more) { more.hidden = !glance.hidden; more.textContent = glance.hidden ? `${glance.hidden} more in the evidence view.` : ''; }
+  $('#requirementsGlance')?.classList.toggle('hidden', !glance.total);
+  $('.callout.concern')?.setAttribute('data-severity', /not[\s_-]*eligible/i.test(String(latestReport.eligibilityVerdict || '')) ? 'blocking' : 'normal');
   renderInsightPanels();
 
   document.body.classList.remove('analysis-mode');
@@ -777,7 +997,8 @@ function renderReport(report, { save = false, inputs = null } = {}) {
   $('#errorCard')?.classList.add('hidden');
   if (save && !latestReportSaved) { latestHistoryId = saveHistory(latestReport); latestReportSaved = true; renderHistory(); }
   icons();
-  if (inputs) loadSection('insights');
+  updateNav();
+  if (inputs) { loadSection('insights'); announce('Assessment ready. Supporting details are loading.'); }
   window.requestAnimationFrame(() => $('#report')?.focus({ preventScroll: true }));
 }
 
@@ -886,6 +1107,9 @@ $('#printBtn')?.addEventListener('click', () => { if (!exportBlocked()) window.p
 function reset() {
   profileInput.value = '';
   opportunityInput.value = '';
+  profileSource = null;
+  fieldMessage(profileInput, '');
+  fieldMessage(opportunityInput, '');
   latestReport = null;
   latestReportSaved = false;
   latestHistoryId = null;
@@ -893,12 +1117,61 @@ function reset() {
   counts();
   closeDialog();
   showWorkspace();
+  updateNav();
 }
 $$('[data-reset]').forEach((button) => button.addEventListener('click', reset));
 
+// ---- primary navigation: every item performs one action with existing behaviour -----------------
+function showReport() {
+  if (!latestReport) return;
+  document.body.classList.remove('analysis-mode');
+  document.body.classList.add('report-mode');
+  $('#workspace')?.classList.add('hidden');
+  $('#report')?.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: scrollMode() });
+  window.requestAnimationFrame(() => $('#report')?.focus({ preventScroll: true }));
+}
+function updateNav() {
+  const hasReport = Boolean(latestReport) && !abortController;
+  const reportVisible = document.body.classList.contains('report-mode');
+  $$('[data-nav="report"], [data-nav="resources"]').forEach((item) => { item.hidden = !hasReport; });
+  $$('[data-nav]').forEach((item) => {
+    const current = (item.dataset.nav === 'report' && reportVisible) || (item.dataset.nav === 'home' && !reportVisible);
+    if (current) item.setAttribute('aria-current', 'page'); else item.removeAttribute('aria-current');
+  });
+  // On narrow screens the nav scrolls sideways; keep the current item visible. Set scrollLeft directly, because scrollIntoView
+  // would also scroll the page vertically.
+  const nav = $('.header-actions');
+  const active = nav?.querySelector('[aria-current="page"]');
+  if (nav && active && nav.scrollWidth > nav.clientWidth) {
+    const target = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+    nav.scrollTo({ left: Math.max(0, target), behavior: scrollMode() });
+  }
+}
+function focusInput(card, field) {
+  showWorkspace({ scroll: false });
+  $(card)?.scrollIntoView({ behavior: scrollMode(), block: 'start' });
+  field?.focus({ preventScroll: true });
+}
+$$('[data-nav]').forEach((item) => item.addEventListener('click', (event) => {
+  event.preventDefault();
+  if (abortController) { toast('An analysis is running. Cancel it or wait for it to finish first.'); return; }
+  switch (item.dataset.nav) {
+    case 'home': showWorkspace({ scroll: false }); window.scrollTo({ top: 0, behavior: scrollMode() }); break;
+    case 'profile': focusInput('#profileCard', profileInput); break;
+    case 'opportunity': focusInput('#opportunityCard', opportunityInput); break;
+    case 'reports': { const history = $('#history'); if (history) history.open = true; history?.scrollIntoView({ behavior: scrollMode(), block: 'start' }); $('#history > summary')?.focus({ preventScroll: true }); break; }
+    case 'report': showReport(); break;
+    case 'resources': openModule('resources'); break;
+    default: break;
+  }
+  updateNav();
+}));
+new MutationObserver(updateNav).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
 icons();
 counts();
-setupPointerGlow();
+updateNav();
 setupConstellation();
 renderHistory();
 
