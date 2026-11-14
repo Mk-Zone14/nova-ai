@@ -257,8 +257,8 @@ function setupConstellation() {
   const PARALLAX = 0.12; // how far the field moves per px of page scroll, so it feels attached to the page
   // Each node carries one of four tones, so the field reads as a spectrum rather than one grey-blue.
   const paletteForTheme = () => document.documentElement.dataset.theme === 'light'
-    ? { tones: ['48, 72, 205', '0, 128, 190', '122, 58, 205', '205, 42, 128'], halo: 0.22 }
-    : { tones: ['140, 165, 255', '96, 224, 255', '190, 146, 255', '255, 140, 208'], halo: 0.3 };
+    ? { tones: ['28, 46, 168', '0, 96, 156', '92, 30, 172', '172, 16, 100'], halo: 0.3, line: 1, weight: 1.35 }
+    : { tones: ['140, 165, 255', '96, 224, 255', '190, 146, 255', '255, 140, 208'], halo: 0.3, line: 0.9, weight: 1 };
   const nodeCount = () => Math.min(coarse.matches ? 36 : 84, Math.max(22, Math.floor((width * height) / 18000)));
   // Text and cards: static lines and nodes inside these are drawn faintly so the field never competes with copy.
   const QUIET_SELECTOR = '.hero-copy, .sample-decision, .trust-strip, .input-card, .decision-hero, .report-context, .requirements-glance, .module-grid, .supplemental-grid, .preparation-details, .history-card, .loading-panel, .error-card';
@@ -401,8 +401,8 @@ function setupConstellation() {
         if (distance > 160) continue;
         const proximity = pointer.active ? Math.max(0, 1 - Math.hypot((a.x + b.x) / 2 - pointer.x, (a.y + b.y) / 2 - pointer.y) / 180) : 0;
         const fade = Math.max(starFade(all[i], time), 0) * Math.max(starFade(all[j], time), 0);
-        context.strokeStyle = `rgba(${palette.tones[all[i].tone]}, ${proximity > 0.05 ? 0.5 + proximity * 0.5 : 0.9})`;
-        context.lineWidth = proximity > 0.05 ? 2.2 : 1.5;
+        context.strokeStyle = `rgba(${palette.tones[all[i].tone]}, ${proximity > 0.05 ? 0.5 + proximity * 0.5 : palette.line})`;
+        context.lineWidth = (proximity > 0.05 ? 2.2 : 1.5) * palette.weight;
         const calm = inQuiet(a) || inQuiet(b);
         const live = proximity > 0.05 || all[i].born || all[j].born;
         context.globalAlpha = (calm ? (live ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * fade * Math.min(1, 1.25 * (1 - distance / 200));
@@ -420,7 +420,7 @@ function setupConstellation() {
         .filter((entry) => entry.d < 190).sort((x, y) => x.d - y.d).slice(0, 5);
       near.forEach(({ p, d }) => {
         context.strokeStyle = `rgba(${palette.tones[0]}, ${0.95 * (1 - d / 190)})`;
-        context.lineWidth = 1.8;
+        context.lineWidth = 1.8 * palette.weight;
         context.globalAlpha = inQuiet(p) ? LIVE_QUIET_ALPHA : 1;
         context.beginPath();
         context.moveTo(pointer.x, pointer.y);
@@ -444,7 +444,7 @@ function setupConstellation() {
       const distance = pointer.active ? Math.hypot(p.x - pointer.x, p.y - pointer.y) : 9999;
       const active = distance < 140 || node.glow > 0.05;
       const tone = palette.tones[node.tone];
-      const radius = (active ? 4.6 : 2.8) + node.glow * 2.5 + (node.born ? 1.8 : 0);
+      const radius = (active ? 4.6 : 2.8) * palette.weight + node.glow * 2.5 + (node.born ? 1.8 : 0);
       context.globalAlpha = (inQuiet(p) ? (active || node.born ? LIVE_QUIET_ALPHA : QUIET_ALPHA) : 1) * Math.max(starFade(node, time), 0);
       if (active || node.born) {
         // Soft halo: a wide translucent disc under the node, cheaper than shadowBlur.
