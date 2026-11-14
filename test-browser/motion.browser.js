@@ -116,3 +116,91 @@ test('the sample menu closes on Escape (focus returns to its button) and on an o
   assert.equal(await menu.evaluate((el) => el.open), false);
   await context.close();
 });
+
+// Mean luminance of a 6px-tall band, read back from a real screenshot (decoded in the page; no image library needed).
+async function bandLuma(page, x, y, width) {
+  const png = await page.screenshot({ clip: { x, y, width, height: 6 } });
+  return page.evaluate(async (base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width; canvas.height = image.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(image, 0, 0);
+    const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const rows = [0, 0];
+    const half = canvas.height / 2;
+    for (let row = 0; row < canvas.height; row += 1) {
+      for (let col = 0; col < canvas.width; col += 1) {
+        const i = (row * canvas.width + col) * 4;
+        rows[row < half ? 0 : 1] += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      }
+    }
+    const n = canvas.width * half;
+    return [rows[0] / n, rows[1] / n];
+  }, png.toString('base64'));
+}
+
+test('the pointer glow fades out before the hero box ends: no visible rectangle edge', async () => {
+  for (const theme of ['dark', 'light']) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await context.newPage();
+    await page.addInitScript((t) => localStorage.setItem('opportunity-theme', t), theme);
+    await page.route((url) => !url.href.startsWith(baseUrl), (route) => route.abort());
+    await page.goto(baseUrl);
+    await page.addStyleTag({ content: '.site-header{position:static!important}' });
+    const zone = await page.locator('[data-pointer-zone]').boundingBox();
+    // Hold the pointer just inside the top of the hero, where the glow used to be cut off.
+    await page.mouse.move(zone.x + 300, zone.y + 40, { steps: 6 });
+    await page.waitForTimeout(500);
+    for (const [name, y] of [['top edge', zone.y]]) {
+      const [above, below] = await bandLuma(page, zone.x + 20, y - 3, 560);
+      assert.ok(Math.abs(below - above) < 2.5, `${theme} ${name}: luminance steps from ${above.toFixed(1)} to ${below.toFixed(1)}`);
+    }
+    await context.close();
+  }
+});
+
+test('the field has feathered edges (mask) instead of a hard canvas boundary', async () => {
+  const { context, page } = await open();
+  const mask = await page.locator('#constellationField').evaluate((el) => { const s = getComputedStyle(el); return s.maskImage || s.webkitMaskImage; });
+  assert.match(mask, /linear-gradient/);
+  await context.close();
+});
+
+test('clicking the hero background adds a star and a ripple; clicking a control does not', async () => {
+  const { context, page } = await open();
+  const stars = () => page.locator('#constellationField').getAttribute('data-stars');
+  assert.equal(await stars(), '0');
+  const zone = await page.locator('[data-pointer-zone]').boundingBox();
+  await page.mouse.click(zone.x + 640, zone.y + zone.height - 40); // empty space under the card
+  assert.equal(await stars(), '1');
+  await page.locator('.hero-secondary').click();
+  assert.equal(await stars(), '1', 'a link click must not add a star');
+  await page.locator('[data-pointer-card]').click({ position: { x: 20, y: 20 } });
+  assert.equal(await stars(), '1', 'a click on the sample card must not add a star');
+  for (let i = 0; i < 14; i += 1) await page.mouse.click(zone.x + 300 + i * 20, zone.y + zone.height - 30);
+  assert.ok(Number(await stars()) <= 10, 'stars are capped');
+  await context.close();
+});
+
+test('the interaction hint is shown, then fades once the visitor has used the field', async () => {
+  const { context, page } = await open();
+  const hint = page.locator('#constellationHint');
+  assert.match(await hint.innerText(), /click the background to add a star/i);
+  assert.equal(await hint.getAttribute('aria-hidden'), 'true');
+  const zone = await page.locator('[data-pointer-zone]').boundingBox();
+  await page.mouse.click(zone.x + 640, zone.y + zone.height - 40);
+  await page.waitForFunction(() => document.getElementById('constellationHint').classList.contains('is-used'));
+  await context.close();
+});
+
+test('with reduced motion the field is static: no hint, no stars', async () => {
+  const { context, page } = await open({ reducedMotion: 'reduce' });
+  assert.equal(await page.locator('#constellationHint').isHidden(), true);
+  const zone = await page.locator('[data-pointer-zone]').boundingBox();
+  await page.mouse.click(zone.x + 640, zone.y + zone.height - 40);
+  assert.equal(await page.locator('#constellationField').getAttribute('data-stars'), '0');
+  await context.close();
+});
