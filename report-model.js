@@ -405,7 +405,7 @@
     const counts = statusCounts(report);
     if (module === 'requirements') {
       const match = requirementsMatch(report);
-      const matchHtml = match ? `<div class="detail-summary"><b>Requirements match:</b> ${safe(requirementsMatchText(report))}. Eligibility depends only on the hard requirements; this count covers every listed requirement.${match.fitExplanation ? `<br><b>Fit score:</b> ${safe(match.fitExplanation)}` : ''}${match.evidenceExplanation ? `<br><b>Evidence coverage:</b> ${safe(match.evidenceExplanation)}` : ''}</div>` : '';
+      const matchHtml = match ? `<details class="how-scored"><summary>How this is scored</summary><div class="detail-summary"><b>Requirements match:</b> ${safe(requirementsMatchText(report))}. Eligibility depends only on the hard requirements; this count covers every listed requirement.${match.fitExplanation ? `<br><b>Fit score:</b> ${safe(match.fitExplanation)}` : ''}${match.evidenceExplanation ? `<br><b>Evidence coverage:</b> ${safe(match.evidenceExplanation)}` : ''}</div></details>` : '';
       return { title: 'Requirements', subtitle: `${counts.met} of ${counts.total || 0} mapped requirements matched`, html: `<div class="detail-summary">Each item connects the opportunity requirement to the evidence Nova found in the supplied profile.</div>${matchHtml}<div class="detail-list">${counts.items.length ? counts.items.map(detailRequirement).join('') : '<span class="empty">No requirements were identified.</span>'}</div>` };
     }
     if (module === 'strengths') {
