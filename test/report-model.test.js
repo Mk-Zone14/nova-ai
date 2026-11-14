@@ -564,3 +564,29 @@ test('historyTitle names a saved report after its opportunity and falls back to 
   assert.equal(model.historyTitle({}), 'Analysis');
   assert.equal(model.historyTitle(null), 'Analysis');
 });
+
+// ---- Phase 5: requirements at a glance -------------------------------------------------------------------------------
+test('requirementsGlance lists required items first, uses the shared status words and escapes model text', () => {
+  const report = { requirementMapping: [
+    { requirement: 'Nice to have <b>Docker</b>', status: 'MISSING', mandatory: false },
+    { requirement: 'Python', status: 'MET', mandatory: true },
+    { requirement: 'SQL', status: 'PARTIAL', mandatory: true },
+    { requirement: 'Unclear one', status: 'weird', mandatory: false }
+  ] };
+  const glance = model.requirementsGlance(report);
+  assert.deepEqual(glance.rows.map((row) => row.text), ['Python', 'SQL', 'Nice to have <b>Docker</b>', 'Unclear one']);
+  assert.deepEqual(glance.rows.map((row) => row.status.label), ['Matched', 'Partially matched', 'Not met', 'Not enough evidence']);
+  assert.equal(glance.total, 4);
+  assert.equal(glance.hidden, 0);
+  assert.doesNotMatch(glance.html, /<b>Docker/);
+  assert.match(glance.html, /&lt;b&gt;Docker/);
+  assert.match(glance.html, /Required/);
+});
+
+test('requirementsGlance caps the list and says how many are not shown', () => {
+  const report = { requirementMapping: Array.from({ length: 11 }, (_, index) => ({ requirement: `Req ${index}`, status: 'MET', mandatory: false })) };
+  const glance = model.requirementsGlance(report, 8);
+  assert.equal(glance.rows.length, 8);
+  assert.equal(glance.hidden, 3);
+  assert.equal(model.requirementsGlance({}).total, 0);
+});

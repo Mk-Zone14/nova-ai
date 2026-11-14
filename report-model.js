@@ -167,6 +167,17 @@
     const items = requirementItems(report);
     return { total: items.length, met: items.filter((item) => normalizeStatus(item.status).key === 'met').length, items };
   }
+  // The requirements at a glance, shown on the report itself so the main question ("which requirements do I meet?") is not
+  // behind a click. Required items come first, then the model's order. Status words come from normalizeStatus, never new wording.
+  function requirementsGlance(report, limit = 8) {
+    const items = requirementItems(report).map((item, index) => ({ item, index }));
+    items.sort((a, b) => (b.item.mandatory === true) - (a.item.mandatory === true) || a.index - b.index);
+    const shown = items.slice(0, limit).map(({ item }) => ({ text: String(item.requirement), mandatory: item.mandatory === true, status: normalizeStatus(item.status) }));
+    return {
+      total: items.length, hidden: Math.max(0, items.length - shown.length), rows: shown,
+      html: shown.map((row) => `<li><span class="glance-name">${safe(row.text)}${row.mandatory ? ' <span class="detail-required">Required</span>' : ''}</span><span class="status-${row.status.key}">${safe(row.status.label)}</span></li>`).join('')
+    };
+  }
   function firstText(values, fallback) {
     return arr(values).find((value) => String(value || '').trim()) || fallback;
   }
@@ -606,7 +617,7 @@
   const api = {
     safe, arr, notAvailable, parse, hasNumber, numberOrNull, adaptNovaReport, friendlyError,
     list, STATUS_LABELS, presentationText, normalizeStatus, humanizeVerdict, requirementItems,
-    statusCounts, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate, reportHeader, narrativeBanner, historyTitle,
+    statusCounts, requirementsGlance, firstText, biggestConcern, nextBestAction, documentGroups, constraintNotes, verifiedMetrics, requirementsMatch, requirementsMatchText, contextCandidate, reportHeader, narrativeBanner, historyTitle,
     detailRequirement, resourceMarkup, strategyMarkup, moduleContent, buildReportText,
     buildAssessmentPayload, mergeNarrative, hasInsights,
     hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,

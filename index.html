@@ -166,7 +166,7 @@
       <div class="decision-hero">
         <div class="decision-main">
           <div class="decision-kicker"><span class="decision-status" id="decisionStatusDot"></span><span id="decisionKicker">Your decision</span></div>
-          <div class="decision-title-row"><div><h3 id="execVerdict">Assessment pending</h3><p id="execRecommendation">Your decision-ready overview will appear here.</p></div><div class="primary-score"><strong id="execScore" aria-label="Fit score not available">--</strong><span>FIT SCORE / 100</span></div></div>
+          <div class="decision-title-row"><div><h3 id="execVerdict">Assessment pending</h3><span class="why-label mono-label">Why Nova reached this</span><p id="execRecommendation">Your decision-ready overview will appear here.</p></div><div class="primary-score"><strong id="execScore" aria-label="Fit score not available">--</strong><span>FIT SCORE / 100</span></div></div>
           <div class="decision-stats"><div><span>Eligibility</span><strong id="decisionEligibility">—</strong></div><div><span>Requirements</span><strong id="decisionRequirements">—</strong></div><div><span>Evidence coverage</span><strong id="decisionConfidence">—</strong></div></div>
           <button class="secondary-button view-analysis-button" id="viewAnalysisBtn" type="button">View evidence <i data-lucide="arrow-down-right"></i></button>
         </div>
@@ -174,6 +174,12 @@
       </div>
 
       <div class="report-context"><div><span class="mono-label">Opportunity</span><strong id="contextOpportunity">—</strong><span id="contextOpportunityMeta">—</span></div><div><span class="mono-label">Candidate</span><strong id="contextCandidate">—</strong><span id="contextCandidateMeta">—</span></div><div><span class="mono-label">Readiness</span><strong id="contextReadiness">—</strong><span id="contextReadinessMeta">Based on supplied evidence</span></div></div>
+
+      <section class="requirements-glance" id="requirementsGlance" aria-labelledby="glanceTitle">
+        <div class="glance-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Requirements</div><h3 id="glanceTitle">Where you stand on each requirement</h3></div><button class="secondary-button" data-module="requirements" type="button">See the evidence <i data-lucide="arrow-up-right"></i></button></div>
+        <ul class="glance-list" id="glanceList"></ul>
+        <p class="glance-more" id="glanceMore" hidden></p>
+      </section>
 
       <div class="module-heading"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Decision support</div><h3>What matters first</h3></div><p>Decision, evidence, blockers, then next moves.</p></div>
       <div class="module-grid primary-module-grid" id="moduleGrid">
@@ -207,7 +213,7 @@
   </main>
 
   <dialog class="analysis-dialog" id="analysisDialog" aria-labelledby="dialogTitle">
-    <div class="dialog-shell"><div class="dialog-header"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Analysis module</div><h2 id="dialogTitle">Evidence</h2><p id="dialogSubtitle">Focused details from your fit brief.</p></div><button class="dialog-close" id="dialogClose" aria-label="Close analysis module" type="button"><i data-lucide="x"></i></button></div><div class="dialog-content" id="dialogContent"></div></div>
+    <div class="dialog-shell"><div class="dialog-header"><div><div class="eyebrow"><span class="eyebrow-mark"></span>Analysis module</div><h2 id="dialogTitle">Evidence</h2><p id="dialogSubtitle">Focused details from your fit brief.</p></div><button class="dialog-close" id="dialogClose" aria-label="Close analysis module" type="button"><i data-lucide="x"></i></button></div><div class="dialog-content" id="dialogContent"></div><div class="dialog-footer"><button class="text-action" id="dialogPrev" type="button"></button><button class="text-action" id="dialogNext" type="button"></button></div></div>
   </dialog>
 
   <div class="toast hidden" id="toast" popover="manual" aria-hidden="true"></div>

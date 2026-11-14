@@ -145,3 +145,31 @@ test('input guidance counts characters toward the minimum, and a file dropped on
   assert.match(await page.locator('#toast').innerText(), /profile box/i);
   await context.close();
 });
+
+test('the report answers "which requirements do I meet?" on the page and explains why before the details', async () => {
+  const { context, page } = await open();
+  await analyse(page);
+  const rows = await page.locator('#glanceList li').count();
+  assert.ok(rows >= 1, 'requirement rows are on the report itself');
+  assert.match(await page.locator('#glanceList').innerText(), /Matched|Not met|Partially matched|Not enough evidence/);
+  assert.equal(await page.evaluate(() => { const g = document.getElementById('requirementsGlance').getBoundingClientRect().top; const m = document.getElementById('moduleGrid').getBoundingClientRect().top; return g < m; }), true, 'requirements come before the module grid');
+  assert.match(await page.locator('.why-label').innerText(), /Why Nova reached this/);
+  assert.ok(['blocking', 'normal'].includes(await page.locator('.callout.concern').getAttribute('data-severity')));
+  await page.locator('#requirementsGlance [data-module="requirements"]').click();
+  assert.equal(await page.evaluate(() => document.getElementById('analysisDialog').open), true);
+  await context.close();
+});
+
+test('the dialog steps through the modules in order and wraps around', async () => {
+  const { context, page } = await open();
+  await analyse(page);
+  await page.click('[data-module="requirements"]');
+  assert.match(await page.locator('#dialogNext').innerText(), /Blockers/);
+  assert.match(await page.locator('#dialogPrev').innerText(), /Resources/, 'wraps from the first module to the last');
+  const titles = [];
+  for (let i = 0; i < 7; i += 1) { titles.push(await page.locator('#dialogTitle').innerText()); await page.click('#dialogNext'); }
+  assert.equal(new Set(titles).size, 7, `each module opens once: ${titles}`);
+  assert.equal(await page.locator('#dialogTitle').innerText(), titles[0], 'seven steps return to the start');
+  assert.equal(await page.evaluate(() => document.getElementById('analysisDialog').open), true);
+  await context.close();
+});

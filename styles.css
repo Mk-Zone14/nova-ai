@@ -437,3 +437,25 @@ body.report-mode .hero, body.report-mode .trust-strip, body.report-mode .workspa
   .analyze-actions { flex: 1; }
   .analyze-actions .analyze-button { flex: 2; min-width: 0; }
 }
+
+/* Phase 5: the report answers its questions on the page. */
+.why-label { display: block; margin-top: 16px; }
+.why-label + p { margin-top: 6px !important; }
+.requirements-glance { margin: 0 0 54px; }
+.glance-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 35px; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.glance-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; min-height: 48px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; line-height: 1.4; }
+.glance-name { min-width: 0; overflow-wrap: anywhere; }
+.glance-list li > span:last-child { flex: 0 0 auto; padding: 3px 8px; border-radius: var(--radius-sm); font: 500 12px "DM Mono", ui-monospace, monospace; }
+.glance-more { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.callout.concern { border-left: 2px solid var(--warning); }
+.callout.concern[data-severity="blocking"] { border-left-color: var(--danger); }
+.callout.concern[data-severity="blocking"] > span { color: var(--danger); }
+.dialog-footer { display: flex; justify-content: space-between; gap: 12px; padding: 4px 25px; border-top: 1px solid var(--line); }
+.dialog-footer .text-action { min-height: 48px; color: var(--accent-strong); }
+@media (max-width: 760px) { .glance-list { grid-template-columns: 1fr; } .glance-heading { align-items: flex-start; flex-direction: column; } }
+
+.glance-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 16px; }
+.glance-heading h3 { margin: 10px 0 0; font-family: Newsreader, Georgia, serif; font-size: 28px; font-weight: 500; letter-spacing: -0.045em; }
+.pdf-export .glance-heading .secondary-button { display: none !important; }
+.pdf-export .glance-heading { break-after: avoid; page-break-after: avoid; }
+.pdf-export .glance-list li { break-inside: avoid; page-break-inside: avoid; }

@@ -20,4 +20,12 @@
   .meter span { background: #16724b !important; }
   article, .decision-hero, .report-context, .supplemental-card { page-break-inside: avoid; break-inside: avoid; }
   h1, h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
+  .glance-heading .secondary-button { display: none !important; }
+  .glance-heading h3 { color: #111 !important; }
+  .glance-list, .glance-list li { border-color: #bbb !important; color: #111 !important; }
+  .glance-list li { break-inside: avoid; }
+  .glance-list .status-met { color: #16724b !important; background: #e5f2ea !important; }
+  .glance-list .status-partial { color: #7a4f12 !important; background: #f6ebd5 !important; }
+  .glance-list .status-missing { color: #9d2f2f !important; background: #f7e1e0 !important; }
+  .glance-list .status-unknown { color: #444 !important; background: #ececec !important; }
 }

@@ -9,7 +9,7 @@ const $$ = (selector) => document.querySelectorAll(selector);
 // Pure report logic lives in report-model.js (loaded before this file) so it can be unit-tested.
 const {
   safe, arr, notAvailable, numberOrNull, adaptNovaReport, friendlyError, list, presentationText,
-  humanizeVerdict, statusCounts, biggestConcern, nextBestAction, reportHeader, narrativeBanner, historyTitle, moduleContent,
+  humanizeVerdict, statusCounts, requirementsGlance, biggestConcern, nextBestAction, reportHeader, narrativeBanner, historyTitle, moduleContent,
   buildAssessmentPayload, mergeNarrative, hasInsights,
   hasModernColor, modernColorToRgba, exportBlockReason, pdfTitle, pdfFilename, responseErrorMessage,
   HISTORY_KEY, normalizeHistory, addHistoryEntry, removeHistoryEntry
@@ -571,7 +571,19 @@ function setHTML(selector, html) {
 const dialog = $('#analysisDialog');
 let activeModule = null;
 function closeDialog() { activeModule = null; if (dialog?.open) dialog.close(); }
+const MODULE_ORDER = [['requirements', 'Evidence'], ['risks', 'Blockers'], ['strategy', 'Next moves'], ['strengths', 'Strengths & weaknesses'], ['gaps', 'Gaps'], ['documents', 'Documents'], ['resources', 'Resources']];
+function paintModuleNav(module) {
+  const index = MODULE_ORDER.findIndex(([name]) => name === module);
+  for (const [id, offset, arrow] of [['#dialogPrev', -1, '←'], ['#dialogNext', 1, '→']]) {
+    const target = MODULE_ORDER[(index + offset + MODULE_ORDER.length) % MODULE_ORDER.length];
+    const button = $(id);
+    if (!button) continue;
+    button.dataset.target = target[0];
+    button.textContent = offset < 0 ? `${arrow} ${target[1]}` : `${target[1]} ${arrow}`;
+  }
+}
 function paintModule(module) {
+  paintModuleNav(module);
   const content = moduleContent(module, latestReport, uiState());
   setText('#dialogTitle', content.title);
   setText('#dialogSubtitle', content.subtitle);
@@ -608,6 +620,15 @@ $('#editInputsBtn')?.addEventListener('click', () => {
   profileInput?.focus({ preventScroll: true });
 });
 $('#dialogClose')?.addEventListener('click', closeDialog);
+['#dialogPrev', '#dialogNext'].forEach((id) => $(id)?.addEventListener('click', (event) => {
+  const target = event.currentTarget.dataset.target;
+  if (!target || !latestReport) return;
+  activeModule = target;
+  paintModule(target);
+  $('#dialogContent').scrollTop = 0;
+  setText('#liveStatus', '');
+  announce(`${$('#dialogTitle').textContent} opened.`);
+}));
 dialog?.addEventListener('click', (event) => { if (event.target === dialog) closeDialog(); });
 dialog?.addEventListener('cancel', closeDialog);
 
@@ -815,6 +836,12 @@ function renderReport(report, { save = false, inputs = null } = {}) {
   $('#decisionRequirements')?.setAttribute('title', match?.fitExplanation || '');
   $('#decisionConfidence')?.setAttribute('title', match?.evidenceExplanation || 'Share of requirement statuses that rest on a quote verified in your profile. Not confidence in the verdict.');
   setText('#contextReadiness', latestReport.readinessCategory ? presentationText(latestReport.readinessCategory) : (readiness === null ? notAvailable() : `${readiness}% ready`));
+  const glance = requirementsGlance(latestReport);
+  setHTML('#glanceList', glance.html);
+  const more = $('#glanceMore');
+  if (more) { more.hidden = !glance.hidden; more.textContent = glance.hidden ? `${glance.hidden} more in the evidence view.` : ''; }
+  $('#requirementsGlance')?.classList.toggle('hidden', !glance.total);
+  $('.callout.concern')?.setAttribute('data-severity', /not[\s_-]*eligible/i.test(String(latestReport.eligibilityVerdict || '')) ? 'blocking' : 'normal');
   renderInsightPanels();
 
   document.body.classList.remove('analysis-mode');
